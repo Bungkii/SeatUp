@@ -51,7 +51,7 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
           type="text" 
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="ชื่อห้อง (เช่น Com Lab 1)"
+          placeholder="ชื่อห้อง (เช่น Yuki and bu)"
           className="w-full p-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none text-center font-bold text-slate-900 transition-all text-lg"
         />
         <button 
