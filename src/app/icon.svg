@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="rotate(-6 256 256)">
+    <!-- พื้นหลังสีดำอมน้ำเงิน (slate-900) ขอบโค้งมน -->
+    <rect x="64" y="64" width="384" height="384" rx="96" fill="#0f172a" />
+    <!-- ไอคอนเก้าอี้สีขาว -->
+    <svg x="128" y="128" width="256" height="256" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4M5 10h14M7 10V5a2 2 0 012-2h6a2 2 0 012 2v5" />
+    </svg>
+  </g>
+</svg>
