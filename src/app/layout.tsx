@@ -1,18 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/react"
-
-export default function RootLayout({ children }) {
-  return (
-    <html lang="th">
-      <body>
-        {children}
-        <Analytics /> {/* วางไว้แค่นี้จบเลย */}
-      </body>
-    </html>
-  )
-}
+import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "JongTee (จองที่) | ระบบจองที่นั่ง",
     description: "ระบบจองที่นั่ง จองที่นั่งห้องเรียน จองที่นั่งโรงเรียน สร้างแผนผังและจัดการง่ายๆ ด้วย JongTee",
-    url: "https://jongtee.bungkii.vercel.app/", // เปลี่ยนเป็น URL เว็บจริงของคุณได้เลย
+    url: "https://jongtee.bungkii.vercel.app/",
     siteName: "JongTee",
     locale: "th_TH",
     type: "website",
@@ -53,10 +42,13 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="th" // เปลี่ยนจาก en เป็น th เพื่อ SEO ของภาษาไทย
+      lang="th"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
