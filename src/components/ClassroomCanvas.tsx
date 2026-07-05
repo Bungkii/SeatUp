@@ -32,6 +32,7 @@ export default function ClassroomCanvas({
   
   const [useMagnetGrid, setUseMagnetGrid] = useState(true); // สำหรับเปิด-ปิด Snap to Grid เวลาลาก
   const [showAutoLayoutModal, setShowAutoLayoutModal] = useState(false);
+  const [globalDeskPrefix, setGlobalDeskPrefix] = useState('T');
   const [autoLayoutConfig, setAutoLayoutConfig] = useState({
     totalDesks: 30,
     desksPerRow: 5, // จำนวนโต๊ะต่อแถว (แนวนอน หรือ แนวลึก)
@@ -199,7 +200,7 @@ export default function ClassroomCanvas({
       id: `T${Date.now()}`,
           x: newX, 
           y: newY,
-      label: `T${desks.length + 1}` // รันเลขโต๊ะอัตโนมัติตามจำนวนที่มี
+      label: `${globalDeskPrefix}${desks.length + 1}` // รันเลขโต๊ะอัตโนมัติตาม prefix
     };
     const updatedDesks = [...desks, newDesk];
     setDesks(updatedDesks);
@@ -389,14 +390,25 @@ export default function ClassroomCanvas({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> Auto Layout
             </span>
           </button>
-          <button
-            onClick={handleAddDesk}
-            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md font-bold transition-colors text-sm flex items-center uppercase"
-          >
-            <span className="flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Desk
-            </span>
-          </button>
+          
+          <div className="flex items-center border border-slate-200 rounded-md overflow-hidden bg-white">
+            <input 
+              type="text" 
+              value={globalDeskPrefix} 
+              onChange={(e) => setGlobalDeskPrefix(e.target.value)}
+              className="w-12 px-2 py-2 text-center text-sm font-bold text-slate-800 outline-none border-r border-slate-200"
+              placeholder="Ex: A"
+              title="Prefix ชื่อโต๊ะ"
+            />
+            <button
+              onClick={handleAddDesk}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 font-bold transition-colors text-sm flex items-center uppercase h-full"
+            >
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Desk
+              </span>
+            </button>
+          </div>
         </div>
       )}
       
