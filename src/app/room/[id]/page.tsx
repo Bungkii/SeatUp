@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { DialogProvider, useDialog } from '@/components/DialogContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled from 'styled-components';
+import html2canvas from 'html2canvas';
 
 const StyledConfirmButton = styled.button`
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
@@ -58,19 +59,18 @@ function BookingContent({ roomId }: { roomId: string }) {
   const [bookingEnded, setBookingEnded] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [pendingZoneSeat, setPendingZoneSeat] = useState<{deskLabel: string, conditionText: string} | null>(null);
+  
+  // สถานะเพื่อรองรับการคำนวณคิวใหม่แบบ Real-time
+  const [queueTime, setQueueTime] = useState<string | null>(null);
+  const [triggerRecount, setTriggerRecount] = useState(0);
 
   useEffect(() => {
     let channel: any;
 
-    // 1. โหลดข้อมูล Local Storage ก่อน (ทำฝั่ง Client เท่านั้น)
+    // โหลดชื่อที่เคยเซฟไว้เบื้องต้น (ถ้ามี) เผื่อว่าเข้าด้วยลิงก์เดิม
     if (typeof window !== 'undefined') {
       const savedName = localStorage.getItem(`jongtee_name_${roomId}`);
-      const savedRank = localStorage.getItem(`jongtee_rank_${roomId}`);
       if (savedName && !studentName) setStudentName(savedName);
-      if (savedRank) {
-        setQueueRank(parseInt(savedRank, 10));
-        setQueueStatus('waiting');
-      }
     }
 
     const fetchData = async () => {
@@ -86,6 +86,21 @@ function BookingContent({ roomId }: { roomId: string }) {
       }
       if (roomData) {
         setRoom(roomData);
+        
+        // 1. โหลดข้อมูล Local Storage แบบชัวร์ๆ ด้วย UUID (ทำฝั่ง Client เท่านั้น)
+        if (typeof window !== 'undefined') {
+          const savedName = localStorage.getItem(`jongtee_name_${roomData.id}`);
+          const savedRank = localStorage.getItem(`jongtee_rank_${roomData.id}`);
+          const savedQueueTime = localStorage.getItem(`jongtee_queue_time_${roomData.id}`);
+          if (savedName && !studentName) setStudentName(savedName);
+          if (savedRank) {
+            setQueueRank(parseInt(savedRank, 10));
+            setQueueStatus('waiting');
+          }
+          if (savedQueueTime) {
+            setQueueTime(savedQueueTime);
+          }
+        }
 
         const fetchBookings = async () => {
           // เพิ่ม id ลงไปในการดึงข้อมูล เพื่อใช้กรองเวลาข้อมูลถูกลบ (DELETE) แบบเรียลไทม์
@@ -112,6 +127,14 @@ function BookingContent({ roomId }: { roomId: string }) {
             setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
           })
           .subscribe();
+
+        // สมัครรับการแจ้งเตือนเมื่อมีการเปลี่ยนแปลงในตารางคิว
+        queueChannel = supabase
+          .channel(`public:room_queues:${roomData.id}-${Date.now()}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'room_queues', filter: `room_id=eq.${roomData.id}` }, () => {
+            setTriggerRecount(prev => prev + 1);
+          })
+          .subscribe();
       }
       setLoading(false);
     };
@@ -119,8 +142,25 @@ function BookingContent({ roomId }: { roomId: string }) {
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (queueChannel) supabase.removeChannel(queueChannel);
     };
   }, [roomId]);
+
+  // Effect สำหรับคำนวณคิวใหม่แบบ Real-time เมื่อมีคนออกจากคิว (หรือจองเสร็จ)
+  useEffect(() => {
+    if (queueTime && room && queueStatus !== 'active') {
+      const recount = async () => {
+        const { count } = await supabase.from('room_queues')
+          .select('*', { count: 'exact', head: true })
+          .eq('room_id', room.id)
+          .lt('created_at', queueTime);
+        const rank = (count || 0) + 1;
+        setQueueRank(rank);
+        localStorage.setItem(`jongtee_rank_${room.id}`, rank.toString());
+      };
+      recount();
+    }
+  }, [triggerRecount, queueTime, room, queueStatus]);
 
   // เปลี่ยนชื่อแท็บเบราว์เซอร์ให้เป็นชื่อห้องอัตโนมัติ
   useEffect(() => {
@@ -237,14 +277,17 @@ function BookingContent({ roomId }: { roomId: string }) {
         
       const rank = (count || 0) + 1;
       setQueueRank(rank);
+      setQueueTime(data.created_at);
       setQueueStatus('waiting');
       
       // บันทึกลง Local Storage เผื่อผู้ใช้เผลอกดรีเฟรชหน้าจอ
       localStorage.setItem(`jongtee_name_${room.id}`, studentName);
       localStorage.setItem(`jongtee_rank_${room.id}`, rank.toString());
+      localStorage.setItem(`jongtee_queue_time_${room.id}`, data.created_at);
       
     } catch (error: any) {
-      showAlert('เกิดข้อผิดพลาดในการเข้าคิว: ' + error.message);
+      setIsBooking(false);
+      showAlert('เกิดข้อผิดพลาดในการจอง: ' + error.message);
     }
   };
 
@@ -306,6 +349,9 @@ function BookingContent({ roomId }: { roomId: string }) {
         showAlert('Error: ' + error.message);
       }
     } else {
+      // ลบออกจากคิวเมื่อจองสำเร็จเพื่อให้คิวเลื่อนสำหรับคนอื่น
+      await supabase.from('room_queues').delete().eq('room_id', room.id).eq('user_name', studentName);
+
       // จองสำเร็จ → แสดงหน้ายืนยันการจอง (Confirmation Card)
       setConfirmedBooking({
         deskId: selectedSeat,
@@ -618,20 +664,29 @@ function BookingContent({ roomId }: { roomId: string }) {
                 {/* คำแนะนำ */}
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
                   <p className="text-amber-700 text-xs font-bold">
-                    <i className="bi bi-camera"></i> กรุณาแคปหน้าจอนี้ไว้เพื่อเป็นหลักฐานการจอง
+                    <i className="bi bi-camera"></i> กรุณาบันทึกภาพนี้หรือแคปหน้าจอไว้เพื่อเป็นหลักฐาน
                   </p>
                 </div>
 
-                {/* ปุ่มปิด */}
-                <button
-                  onClick={() => {
-                    setShowConfirmation(false);
-                    router.push('/');
-                  }}
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-bold text-lg uppercase tracking-wider shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
-                >
-                  เข้าใจแล้ว ปิดหน้านี้
-                </button>
+                {/* ปุ่ม Action */}
+                <div id="confirmation-action-buttons" className="flex flex-col gap-3">
+                  <button
+                    onClick={handleDownloadImage}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold uppercase tracking-wider shadow-md transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    บันทึกภาพหลักฐาน
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowConfirmation(false);
+                      router.push('/');
+                    }}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-bold text-lg uppercase tracking-wider shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                  >
+                    เข้าใจแล้ว ปิดหน้านี้
+                  </button>
+                </div>
               </div>
 
               {/* Footer */}
