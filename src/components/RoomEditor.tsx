@@ -17,6 +17,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   };
   const [startTime, setStartTime] = useState<string>(getLocalTime(room.start_time));
+  const [endTime, setEndTime] = useState<string>(getLocalTime(room.end_time));
 
   // 1. ฟังก์ชันดึงข้อมูลผู้จอง
   const fetchBookings = async () => {
@@ -74,15 +75,23 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
         startTimestamp = now.toISOString();
       }
 
+      let endTimestamp = null;
+      if (endTime) {
+        const now = new Date();
+        const [hours, minutes] = endTime.split(':');
+        now.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0); // ตั้งเป็นเวลาของวันนี้
+        endTimestamp = now.toISOString();
+      }
+
       const { error } = await supabase
         .from('rooms')
-        .update({ start_time: startTimestamp })
+        .update({ start_time: startTimestamp, end_time: endTimestamp })
         .eq('id', room.id);
       if (error) throw error;
-      alert('บันทึกเวลาเปิดจองสำเร็จ!');
+      alert('บันทึกเวลาสำเร็จ!');
       await onDataChange();
     } catch (error: any) {
-      alert('เกิดข้อผิดพลาด: ' + error.message + '\n\n(อย่าลืมเพิ่มคอลัมน์ start_time ชนิด timestamptz ใน Supabase ด้วยนะครับ)');
+      alert('เกิดข้อผิดพลาด: ' + error.message);
     }
   };
 
@@ -91,11 +100,12 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     try {
       const { error } = await supabase
         .from('rooms')
-        .update({ start_time: null })
+        .update({ start_time: null, end_time: null })
         .eq('id', room.id);
       if (error) throw error;
       setStartTime('');
-      alert('ยกเลิกการตั้งเวลาเปิดจองเรียบร้อยแล้ว!');
+      setEndTime('');
+      alert('ยกเลิกการตั้งเวลาเรียบร้อยแล้ว!');
       await onDataChange();
     } catch (error: any) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
@@ -147,8 +157,18 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
         /* ส่วนที่ 1: Editor จัดวางโต๊ะ */
         <div className="bg-slate-50 md:bg-white md:p-8 rounded-none md:rounded-[2.5rem] shadow-none md:shadow-xl border-0 md:border border-indigo-100 animate-in fade-in duration-300 flex flex-col flex-1 absolute inset-0 md:relative w-full h-full z-10">
           <div className="hidden md:flex justify-between items-center mb-4 md:mb-6 px-4 md:px-0 pt-4 md:pt-0">
-            <h3 className="text-lg font-bold text-slate-800 uppercase tracking-widest">
+            <h3 className="text-lg font-bold text-slate-800 uppercase tracking-widest flex items-center gap-3">
               โหมดจัดวางโต๊ะเรียน
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/room/${room.join_code}`);
+                  alert('คัดลอกลิ้งก์เรียบร้อยแล้ว');
+                }}
+                className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-md font-bold transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                แชร์ลิ้งก์จอง
+              </button>
             </h3>
             <div className="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-full font-bold">
               EDITOR MODE
@@ -159,19 +179,31 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
           <div className="hidden md:flex bg-slate-50 p-5 rounded-2xl border border-slate-200 mb-6 flex-col md:flex-row items-center gap-4 justify-between shadow-sm">
             <div className="flex-1 text-center md:text-left">
             <h4 className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 justify-center md:justify-start">
-              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> ตั้งเวลาเปิดจอง
+              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> ตั้งเวลาเปิด-ปิดจอง
             </h4>
-              <p className="text-xs text-slate-500 mt-1">ตั้งเวลาเพื่อบังคับให้ระบบล็อกแผนผังจนกว่าจะถึงเวลาที่กำหนด</p>
+              <p className="text-xs text-slate-500 mt-1">ตั้งเวลาเพื่อบังคับให้ระบบล็อกแผนผังและสิ้นสุดการจองตามเวลา</p>
             </div>
-            <div className="flex w-full md:w-auto items-center gap-2">
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="flex-1 p-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white font-bold text-slate-700"
-              />
+            <div className="flex w-full md:w-auto items-center gap-2 flex-wrap justify-end">
+              <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-300">
+                <span className="text-xs font-bold text-slate-500 uppercase">เปิด</span>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="p-1 text-sm outline-none font-bold text-slate-700 bg-transparent"
+                />
+              </div>
+              <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-300">
+                <span className="text-xs font-bold text-slate-500 uppercase">ปิด</span>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="p-1 text-sm outline-none font-bold text-slate-700 bg-transparent"
+                />
+              </div>
               <button onClick={handleSaveTime} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide shadow-sm">Save</button>
-              {startTime && (
+              {(startTime || endTime) && (
                 <button onClick={handleClearTime} className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide border border-red-100">Clear</button>
               )}
             </div>

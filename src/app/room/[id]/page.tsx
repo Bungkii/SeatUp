@@ -26,6 +26,9 @@ function BookingContent({ roomId }: { roomId: string }) {
   const [showOverlay, setShowOverlay] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [timeLeft, setTimeLeft] = useState<{d: number, h: number, m: number, s: number} | null>(null);
+  const [queueStatus, setQueueStatus] = useState<'not_joined' | 'waiting' | 'active'>('active');
+  const [queueRank, setQueueRank] = useState<number | null>(null);
+  const [bookingEnded, setBookingEnded] = useState(false);
 
   useEffect(() => {
     let channel: any;
@@ -71,41 +74,109 @@ function BookingContent({ roomId }: { roomId: string }) {
     }
   }, [room]);
 
-  // ระบบนับถอยหลัง
+  // ระบบคิวและนับถอยหลัง
   useEffect(() => {
-    if (!room?.start_time) return;
-    const target = new Date(room.start_time).getTime();
+    if (!room) return;
 
-    const updateTimer = () => {
+    const checkTime = () => {
       const now = new Date().getTime();
-      const distance = target - now;
-
-      if (distance <= 0) {
-        if (showOverlay) {
-          setIsFadingOut(true);
-          setTimeout(() => setShowOverlay(false), 500); // รอ Fade Out 500ms
+      
+      // เช็คเวลาจบ
+      if (room.end_time) {
+        const end = new Date(room.end_time).getTime();
+        if (now > end) {
+          setBookingEnded(true);
+          return true; // จบการทำงาน timer
         }
-        return true;
-      } else {
-        setShowOverlay(true);
-        setTimeLeft({
-          d: Math.floor(distance / (1000 * 60 * 60 * 24)),
-          h: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-          m: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
-          s: Math.floor((distance % (1000 * 60)) / 1000),
-        });
-        return false;
       }
+
+      // เช็คเวลาเริ่มและระบบคิว
+      if (room.start_time) {
+        const start = new Date(room.start_time).getTime();
+        
+        if (now < start) {
+          // ยังไม่ถึงเวลาเริ่ม
+          if (queueStatus === 'active') {
+             setQueueStatus('not_joined');
+          }
+        }
+
+        // คิวรอเวลาเข้า
+        let target = start;
+        if (queueRank && queueRank > 0) {
+           target = start + (queueRank - 1) * 5000; // ห่างกันคิวละ 5 วิ
+        }
+
+        const distance = target - now;
+
+        if (distance <= 0) {
+          if (queueStatus !== 'active') {
+             if (showOverlay) {
+               setIsFadingOut(true);
+               setTimeout(() => {
+                 setShowOverlay(false);
+                 setQueueStatus('active');
+               }, 500); // รอ Fade Out 500ms
+             } else {
+               setQueueStatus('active');
+             }
+          }
+          return false; // ไม่ต้องหยุด timer เพราะอาจจะต้องเช็ค end_time ต่อ
+        } else {
+          setShowOverlay(true);
+          setTimeLeft({
+            d: Math.floor(distance / (1000 * 60 * 60 * 24)),
+            h: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+            m: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+            s: Math.floor((distance % (1000 * 60)) / 1000),
+          });
+          return false;
+        }
+      }
+
+      return false;
     };
 
-    const isFinished = updateTimer();
+    const isFinished = checkTime();
     if (isFinished) return;
 
     const interval = setInterval(() => {
-      if (updateTimer()) clearInterval(interval);
+      if (checkTime()) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [room?.start_time, showOverlay]);
+  }, [room, queueStatus, queueRank, showOverlay]);
+
+  const joinQueue = async () => {
+    if (!studentName.trim()) return showAlert('กรุณากรอกชื่อก่อนเข้าคิว');
+    
+    // Check if user already booked
+    const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
+    if (hasBooked) {
+      return showAlert('ขออภัยครับ ชื่อนี้ได้ทำการจองที่นั่งไปแล้ว');
+    }
+
+    try {
+      const { data, error } = await supabase.from('room_queues').insert([{
+        room_id: room.id,
+        user_name: studentName
+      }]).select().single();
+      
+      if (error) throw error;
+      
+      // หาลำดับคิว
+      const { count } = await supabase.from('room_queues')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', room.id)
+        .lt('created_at', data.created_at);
+        
+      const rank = (count || 0) + 1;
+      setQueueRank(rank);
+      setQueueStatus('waiting');
+      
+    } catch (error: any) {
+      showAlert('เกิดข้อผิดพลาดในการเข้าคิว: ' + error.message);
+    }
+  };
 
   const handleSeatClick = (deskLabel: string) => {
     const isBooked = bookings.some(b => b.desk_id === deskLabel);
@@ -215,25 +286,56 @@ function BookingContent({ roomId }: { roomId: string }) {
           </div>
         </div>
   
+        {/* Overlay จบการจอง */}
+        {bookingEnded && (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
+             <div className="text-center">
+               <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-widest mb-4">การจองสิ้นสุดลงแล้ว</h2>
+               <p className="text-slate-300 md:text-xl">ขออภัย หมดเวลาสำหรับการจองที่นั่งในรอบนี้</p>
+             </div>
+          </div>
+        )}
+
         {/* Overlay นับถอยหลังรอจอง */}
-        {showOverlay && (
-          <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500 ${isFadingOut ? 'opacity-0' : 'animate-in fade-in'}`}>
-            <div className="text-center flex flex-col items-center z-10 px-4">
-              <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-widest mb-2 md:mb-4 drop-shadow-lg">ยังไม่ถึงเวลาเปิดจอง</h2>
-              <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
-  
-              {timeLeft && (
-                <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
-                  {timeLeft.h > 0 && (
-                    <>
-                      <span>{timeLeft.h.toString().padStart(2, '0')}</span>
+        {showOverlay && queueStatus !== 'active' && !bookingEnded && (
+          <div className={`fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500 ${isFadingOut ? 'opacity-0' : 'animate-in fade-in'}`}>
+            <div className="text-center flex flex-col items-center z-10 px-4 w-full">
+              {queueStatus === 'not_joined' ? (
+                 <div className="bg-white p-8 rounded-2xl max-w-sm w-full mx-auto shadow-2xl">
+                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest mb-2">เตรียมตัวจอง</h2>
+                    <p className="text-slate-500 text-sm mb-6">กรุณากรอกชื่อของคุณเพื่อเข้าสู่ห้องรอคิว</p>
+                    <input 
+                       type="text"
+                       value={studentName}
+                       onChange={(e) => setStudentName(e.target.value)}
+                       placeholder="ชื่อของคุณ"
+                       className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none font-bold text-center mb-4 text-slate-900 transition-all text-lg"
+                    />
+                    <button onClick={joinQueue} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl transition-colors uppercase tracking-widest shadow-lg shadow-red-600/30 hover:-translate-y-1">
+                       เข้าห้องรอคิว
+                    </button>
+                 </div>
+              ) : (
+                 <>
+                  <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-widest mb-2 md:mb-4 drop-shadow-lg">
+                    {queueRank ? `คุณอยู่ในคิวลำดับที่ ${queueRank}` : 'กำลังรอเข้าห้อง'}
+                  </h2>
+                  <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
+      
+                  {timeLeft && (
+                    <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+                      {timeLeft.h > 0 && (
+                        <>
+                          <span>{timeLeft.h.toString().padStart(2, '0')}</span>
+                          <span className="text-slate-500/80 -mt-1">:</span>
+                        </>
+                      )}
+                      <span>{timeLeft.m.toString().padStart(2, '0')}</span>
                       <span className="text-slate-500/80 -mt-1">:</span>
-                    </>
+                      <span className="text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{timeLeft.s.toString().padStart(2, '0')}</span>
+                    </div>
                   )}
-                  <span>{timeLeft.m.toString().padStart(2, '0')}</span>
-                  <span className="text-slate-500/80 -mt-1">:</span>
-                  <span className="text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{timeLeft.s.toString().padStart(2, '0')}</span>
-                </div>
+                 </>
               )}
             </div>
           </div>
