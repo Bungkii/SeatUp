@@ -486,7 +486,7 @@ export default function ClassroomCanvas({
                   if (isReadOnly) {
                     if (desk.isObject) return showAlert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
                     if (!isBooked) {
-                      onSave(desk.label); // ถ้าว่างถึงจะกดจองได้
+                      onSave(desk.label, desk.zoneId); // ถ้าว่างถึงจะกดจองได้ พร้อมส่ง zoneId
                     } else {
                       showAlert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
                     }
@@ -498,7 +498,7 @@ export default function ClassroomCanvas({
                   if (isReadOnly) {
                     if (desk.isObject) return showAlert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
                     if (!isBooked) {
-                      onSave(desk.label);
+                      onSave(desk.label, desk.zoneId);
                     } else {
                       showAlert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
                     }

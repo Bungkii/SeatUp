@@ -10,14 +10,16 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const [activeTab, setActiveTab] = useState<'dashboard' | 'editor'>('editor');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
-  // แปลงเวลา ISO เป็น Format สำหรับ input time (HH:mm)
-  const getLocalTime = (isoString?: string) => {
+  // แปลงเวลา ISO เป็น Format สำหรับ input datetime-local (YYYY-MM-DDTHH:mm)
+  const getLocalDatetime = (isoString?: string) => {
     if (!isoString) return '';
     const date = new Date(isoString);
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    if (isNaN(date.getTime())) return '';
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
   };
-  const [startTime, setStartTime] = useState<string>(getLocalTime(room.start_time));
-  const [endTime, setEndTime] = useState<string>(getLocalTime(room.end_time));
+  const [startTime, setStartTime] = useState<string>(getLocalDatetime(room.start_time));
+  const [endTime, setEndTime] = useState<string>(getLocalDatetime(room.end_time));
 
   // 1. ฟังก์ชันดึงข้อมูลผู้จอง
   const fetchBookings = async () => {
@@ -69,18 +71,12 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     try {
       let startTimestamp = null;
       if (startTime) {
-        const now = new Date();
-        const [hours, minutes] = startTime.split(':');
-        now.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0); // ตั้งเป็นเวลาของวันนี้
-        startTimestamp = now.toISOString();
+        startTimestamp = new Date(startTime).toISOString();
       }
 
       let endTimestamp = null;
       if (endTime) {
-        const now = new Date();
-        const [hours, minutes] = endTime.split(':');
-        now.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0); // ตั้งเป็นเวลาของวันนี้
-        endTimestamp = now.toISOString();
+        endTimestamp = new Date(endTime).toISOString();
       }
 
       const { error } = await supabase
@@ -276,7 +272,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
               <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-300">
                 <span className="text-xs font-bold text-slate-500 uppercase">เปิด</span>
                 <input
-                  type="time"
+                  type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   className="p-1 text-sm outline-none font-bold text-slate-700 bg-transparent"
@@ -285,7 +281,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
               <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-300">
                 <span className="text-xs font-bold text-slate-500 uppercase">ปิด</span>
                 <input
-                  type="time"
+                  type="datetime-local"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="p-1 text-sm outline-none font-bold text-slate-700 bg-transparent"
@@ -429,16 +425,22 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
                   <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   ตั้งเวลาเปิดจอง
                 </label>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col gap-2 mb-3">
                   <input
-                    type="time"
+                    type="datetime-local"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="flex-1 p-3 rounded-lg border border-slate-300 text-base outline-none focus:border-indigo-500 bg-white font-bold text-slate-700 shadow-inner"
+                    className="w-full p-3 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 bg-white font-bold text-slate-700 shadow-inner"
                   />
-                  <button onClick={() => { handleSaveTime(); setShowMobileMenu(false); }} className="bg-slate-900 text-white px-5 rounded-lg font-bold uppercase shadow-md">Save</button>
+                  <input
+                    type="datetime-local"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 bg-white font-bold text-slate-700 shadow-inner"
+                  />
+                  <button onClick={() => { handleSaveTime(); setShowMobileMenu(false); }} className="w-full bg-slate-900 text-white p-3 rounded-lg font-bold uppercase shadow-md">Save</button>
                 </div>
-                {startTime && (
+                {(startTime || endTime) && (
                   <button onClick={() => { handleClearTime(); setShowMobileMenu(false); }} className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg uppercase tracking-wider text-sm border border-red-100 transition-colors">
                     ยกเลิกการตั้งเวลา
                   </button>

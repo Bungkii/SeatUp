@@ -56,6 +56,8 @@ function BookingContent({ roomId }: { roomId: string }) {
   const [queueStatus, setQueueStatus] = useState<'not_joined' | 'waiting' | 'active'>('active');
   const [queueRank, setQueueRank] = useState<number | null>(null);
   const [bookingEnded, setBookingEnded] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [pendingZoneSeat, setPendingZoneSeat] = useState<{deskLabel: string, conditionText: string} | null>(null);
 
   useEffect(() => {
     let channel: any;
@@ -246,9 +248,21 @@ function BookingContent({ roomId }: { roomId: string }) {
     }
   };
 
-  const handleSeatClick = (deskLabel: string) => {
+  const handleSeatClick = (deskLabel: string, zoneId?: string) => {
+    if (isPreviewMode || queueStatus !== 'active') return showAlert('คุณกำลังอยู่ในโหมดดูแผนผังล่วงหน้า หรือยังไม่ถึงคิวของคุณ ไม่สามารถกดจองได้ครับ');
+    
     const isBooked = bookings.some(b => b.desk_id === deskLabel);
     if (isBooked) return; // ถ้าจองแล้วกดไม่ได้
+    
+    // ตรวจสอบเงื่อนไขโซน
+    if (zoneId && zones.length > 0) {
+      const zone = zones.find(z => z.id === zoneId);
+      if (zone && zone.condition_text) {
+        setPendingZoneSeat({ deskLabel, conditionText: zone.condition_text });
+        return;
+      }
+    }
+    
     setSelectedSeat(deskLabel); // เก็บค่าโต๊ะที่เลือก
   };
 
@@ -417,9 +431,9 @@ function BookingContent({ roomId }: { roomId: string }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/85 backdrop-blur-md"
+              className={`fixed z-[60] flex flex-col items-center justify-center transition-all duration-500 ${isPreviewMode ? 'bottom-4 left-1/2 -translate-x-1/2 inset-auto w-auto rounded-2xl bg-black/90 p-4 shadow-2xl backdrop-blur-md' : 'inset-0 bg-black/85 backdrop-blur-md'}`}
             >
-              <div className="text-center flex flex-col items-center z-10 px-4 w-full">
+              <div className={`text-center flex flex-col items-center z-10 ${isPreviewMode ? 'px-2' : 'px-4 w-full'}`}>
                 {queueStatus === 'not_joined' ? (
                    <motion.div 
                      initial={{ scale: 0.9, y: 20 }}
@@ -444,15 +458,15 @@ function BookingContent({ roomId }: { roomId: string }) {
                      initial={{ scale: 0.95, opacity: 0 }}
                      animate={{ scale: 1, opacity: 1 }}
                    >
-                    <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-widest mb-2 md:mb-4 drop-shadow-lg">
-                      {queueRank ? `คุณอยู่ในคิวลำดับที่ ${queueRank}` : 'กำลังรอเข้าห้อง'}
+                    <h2 className={`${isPreviewMode ? 'text-sm md:text-base mb-1' : 'text-2xl md:text-4xl mb-2 md:mb-4'} font-black text-white uppercase tracking-widest drop-shadow-lg`}>
+                      {queueRank ? `คิวลำดับที่ ${queueRank}` : 'กำลังรอเข้าห้อง'}
                     </h2>
                     
                     {timeLeft ? (
                       <>
-                        <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
+                        {!isPreviewMode && <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>}
             
-                        <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+                        <div className={`flex gap-2 md:gap-4 text-white font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] ${isPreviewMode ? 'text-2xl justify-center' : 'text-6xl md:text-8xl'}`}>
                           {timeLeft.h > 0 && (
                             <>
                               <span>{timeLeft.h.toString().padStart(2, '0')}</span>
@@ -466,17 +480,73 @@ function BookingContent({ roomId }: { roomId: string }) {
                       </>
                     ) : (
                       <div className="flex flex-col items-center">
-                        <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md text-center max-w-lg leading-relaxed">
-                          กรุณารอสักครู่ ระบบจะทยอยให้ผู้ใช้เข้าจองที่นั่งตามลำดับคิว
-                          เพื่อป้องกันระบบขัดข้อง<br/>
-                          <span className="text-amber-400 text-xs md:text-sm mt-2 block font-bold">*หากคุณรีเฟรชหน้าจอ คิวของคุณจะไม่หาย*</span>
-                        </p>
-                        <div className="w-12 h-12 border-4 border-slate-600 border-t-red-500 rounded-full animate-spin"></div>
+                        {!isPreviewMode && (
+                          <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md text-center max-w-lg leading-relaxed">
+                            กรุณารอสักครู่ ระบบจะทยอยให้ผู้ใช้เข้าจองที่นั่งตามลำดับคิว
+                            เพื่อป้องกันระบบขัดข้อง<br/>
+                            <span className="text-amber-400 text-xs md:text-sm mt-2 block font-bold">*หากคุณรีเฟรชหน้าจอ คิวของคุณจะไม่หาย*</span>
+                          </p>
+                        )}
+                        <div className="w-8 h-8 md:w-12 md:h-12 border-4 border-slate-600 border-t-red-500 rounded-full animate-spin"></div>
                       </div>
                     )}
+                    
+                    {/* ปุ่มดูแผนผังล่วงหน้า */}
+                    <button 
+                      onClick={() => setIsPreviewMode(!isPreviewMode)}
+                      className={`mt-6 md:mt-10 px-6 py-3 rounded-xl font-bold uppercase tracking-widest transition-all ${isPreviewMode ? 'bg-slate-800 text-white hover:bg-slate-700 text-xs' : 'bg-white/10 text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm'}`}
+                    >
+                      {isPreviewMode ? 'ย่อกลับไปรอคิว' : '👀 ดูแผนผังล่วงหน้า'}
+                    </button>
                    </motion.div>
                 )}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ===== ZONE CONDITION MODAL ===== */}
+        <AnimatePresence>
+          {pendingZoneSeat && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col"
+              >
+                <div className="bg-indigo-600 p-6 text-center text-white">
+                  <h3 className="text-xl font-black uppercase tracking-widest mb-1">เงื่อนไขการจองโซนนี้</h3>
+                  <p className="text-indigo-200 text-sm">โต๊ะ: {pendingZoneSeat.deskLabel}</p>
+                </div>
+                <div className="p-6">
+                  <p className="text-slate-700 text-sm leading-relaxed mb-8 whitespace-pre-wrap">
+                    {pendingZoneSeat.conditionText}
+                  </p>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setPendingZoneSeat(null)}
+                      className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold uppercase text-sm hover:bg-slate-200 transition-colors"
+                    >
+                      ปฏิเสธ
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setSelectedSeat(pendingZoneSeat.deskLabel);
+                        setPendingZoneSeat(null);
+                      }}
+                      className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold uppercase text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-600/30 transition-colors"
+                    >
+                      ยอมรับเงื่อนไข
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
