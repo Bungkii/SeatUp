@@ -35,8 +35,8 @@ function BookingContent({ roomId }: { roomId: string }) {
 
     // 1. โหลดข้อมูล Local Storage ก่อน (ทำฝั่ง Client เท่านั้น)
     if (typeof window !== 'undefined') {
-      const savedName = localStorage.getItem(`seatup_name_${roomId}`);
-      const savedRank = localStorage.getItem(`seatup_rank_${roomId}`);
+      const savedName = localStorage.getItem(`jongtee_name_${roomId}`);
+      const savedRank = localStorage.getItem(`jongtee_rank_${roomId}`);
       if (savedName && !studentName) setStudentName(savedName);
       if (savedRank) {
         setQueueRank(parseInt(savedRank, 10));
@@ -88,9 +88,9 @@ function BookingContent({ roomId }: { roomId: string }) {
   // เปลี่ยนชื่อแท็บเบราว์เซอร์ให้เป็นชื่อห้องอัตโนมัติ
   useEffect(() => {
     if (room?.name) {
-      document.title = `${room.name} | SeatUp`;
+      document.title = `${room.name} | JongTee`;
     } else {
-      document.title = "SeatUp";
+      document.title = "JongTee";
     }
   }, [room]);
 
@@ -203,8 +203,8 @@ function BookingContent({ roomId }: { roomId: string }) {
       setQueueStatus('waiting');
       
       // บันทึกลง Local Storage เผื่อผู้ใช้เผลอกดรีเฟรชหน้าจอ
-      localStorage.setItem(`seatup_name_${room.id}`, studentName);
-      localStorage.setItem(`seatup_rank_${room.id}`, rank.toString());
+      localStorage.setItem(`jongtee_name_${room.id}`, studentName);
+      localStorage.setItem(`jongtee_rank_${room.id}`, rank.toString());
       
     } catch (error: any) {
       showAlert('เกิดข้อผิดพลาดในการเข้าคิว: ' + error.message);

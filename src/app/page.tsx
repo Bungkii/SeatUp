@@ -27,7 +27,7 @@ function PageContent() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   useEffect(() => {
-    document.title = "SeatUp";
+    document.title = "JongTee";
   }, []);
 
   const refetchEditingRoom = async () => {

@@ -1,6 +1,6 @@
 -- =======================================================================================
--- SEATUP (JONGTEE) - FULL SUPABASE DATABASE SCHEMA
--- This file contains all necessary tables, policies, and settings for the SeatUp project.
+-- JONGTEE - FULL SUPABASE DATABASE SCHEMA
+-- This file contains all necessary tables, policies, and settings for the JongTee project.
 -- =======================================================================================
 
 -- 1. Create `rooms` table

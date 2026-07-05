@@ -7,7 +7,7 @@ export default function ManualPage() {
         <header className="flex justify-between items-start flex-wrap gap-4 mb-10">
           <div>
             <h1 className="text-[2rem] font-semibold text-[#111] mb-2">คู่มือการใช้งาน JONGTEE</h1>
-            <p className="text-[1rem] text-[#666666]">ระบบจองที่นั่งและจัดการห้องเรียน (SeatUp)</p>
+            <p className="text-[1rem] text-[#666666]">ระบบจองที่นั่งและจัดการห้องเรียน (JongTee)</p>
           </div>
           <button 
             onClick={() => window.print()} 
