@@ -43,21 +43,33 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.room_queues ENABLE ROW LEVEL SECURITY;
 
 -- `rooms` policies: allow anonymous access for reading and creating rooms
+DROP POLICY IF EXISTS "Allow anonymous select rooms" ON public.rooms;
 CREATE POLICY "Allow anonymous select rooms" ON public.rooms FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow anonymous insert rooms" ON public.rooms;
 CREATE POLICY "Allow anonymous insert rooms" ON public.rooms FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow anonymous update rooms" ON public.rooms;
 CREATE POLICY "Allow anonymous update rooms" ON public.rooms FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow anonymous delete rooms" ON public.rooms;
 CREATE POLICY "Allow anonymous delete rooms" ON public.rooms FOR DELETE USING (true);
 
 -- `bookings` policies: allow anonymous access for reading and booking
+DROP POLICY IF EXISTS "Allow anonymous select bookings" ON public.bookings;
 CREATE POLICY "Allow anonymous select bookings" ON public.bookings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow anonymous insert bookings" ON public.bookings;
 CREATE POLICY "Allow anonymous insert bookings" ON public.bookings FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow anonymous update bookings" ON public.bookings;
 CREATE POLICY "Allow anonymous update bookings" ON public.bookings FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow anonymous delete bookings" ON public.bookings;
 CREATE POLICY "Allow anonymous delete bookings" ON public.bookings FOR DELETE USING (true);
 
 -- `room_queues` policies: allow anonymous access for waiting room queue
+DROP POLICY IF EXISTS "Allow anonymous select room_queues" ON public.room_queues;
 CREATE POLICY "Allow anonymous select room_queues" ON public.room_queues FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow anonymous insert room_queues" ON public.room_queues;
 CREATE POLICY "Allow anonymous insert room_queues" ON public.room_queues FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow anonymous update room_queues" ON public.room_queues;
 CREATE POLICY "Allow anonymous update room_queues" ON public.room_queues FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow anonymous delete room_queues" ON public.room_queues;
 CREATE POLICY "Allow anonymous delete room_queues" ON public.room_queues FOR DELETE USING (true);
 
 -- =======================================================================================
