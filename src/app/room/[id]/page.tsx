@@ -55,6 +55,21 @@ function BookingContent({ roomId }: { roomId: string }) {
             setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
           })
           .subscribe();
+
+        // กู้คืนคิวถ้าเคยเข้าแล้วและรีเฟรชหน้าจอ
+        const savedName = localStorage.getItem(`seatup_queue_name_${roomData.id}`);
+        if (savedName && !nameFromQuery) {
+          setStudentName(savedName);
+          const { data: queueData } = await supabase.from('room_queues').select('*').eq('room_id', roomData.id).eq('user_name', savedName).maybeSingle();
+          if (queueData) {
+            const { count } = await supabase.from('room_queues')
+              .select('*', { count: 'exact', head: true })
+              .eq('room_id', roomData.id)
+              .lt('created_at', queueData.created_at);
+            setQueueRank((count || 0) + 1);
+            setQueueStatus('waiting');
+          }
+        }
       }
       setLoading(false);
     };
@@ -173,6 +188,7 @@ function BookingContent({ roomId }: { roomId: string }) {
       const rank = (count || 0) + 1;
       setQueueRank(rank);
       setQueueStatus('waiting');
+      localStorage.setItem(`seatup_queue_name_${room.id}`, studentName); // บันทึกไว้เผื่อผู้ใช้รีเฟรชหน้าจอ
       
     } catch (error: any) {
       showAlert('เกิดข้อผิดพลาดในการเข้าคิว: ' + error.message);
