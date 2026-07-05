@@ -124,6 +124,29 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     }
   };
 
+  // ฟังก์ชันส่งออกเป็น CSV
+  const handleExportCSV = () => {
+    if (bookings.length === 0) {
+      alert('ไม่มีข้อมูลสำหรับส่งออก');
+      return;
+    }
+    const header = ['เวลาที่จอง', 'หมายเลขโต๊ะ', 'ชื่อ-นามสกุล'];
+    const rows = bookings.map(b => [
+      new Date(b.created_at).toLocaleString('th-TH'),
+      b.desk_id,
+      b.user_name
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [header, ...rows].map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `bookings_${room.name || 'export'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex-1 flex flex-col md:space-y-6 h-full relative">
       {/* โหมดมือถือ: ปุ่มลอยสำหรับเปิดเมนู Settings */}
@@ -161,7 +184,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
               โหมดจัดวางโต๊ะเรียน
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/room/${room.join_code}`);
+                  navigator.clipboard.writeText(`${window.location.origin}/room/${room.join_code || room.id}`);
                   alert('คัดลอกลิ้งก์เรียบร้อยแล้ว');
                 }}
                 className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-md font-bold transition-colors flex items-center gap-1 cursor-pointer"
@@ -238,11 +261,18 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
                 <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide mb-1">รายชื่อผู้จอง</h3>
                 <p className="text-sm text-slate-500">ที่นั่งถูกจองแล้ว {bookings.length} / {room.layout_config?.length || 0} โต๊ะ</p>
               </div>
-              <button onClick={fetchBookings} className="text-sm bg-white text-slate-700 px-4 py-2 rounded-lg font-bold hover:bg-slate-50 transition-colors border border-slate-200 shadow-sm uppercase">
-            <span className="flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> รีเฟรชข้อมูล
-            </span>
-              </button>
+              <div className="flex gap-2">
+                <button onClick={handleExportCSV} className="text-sm bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm uppercase">
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export CSV
+                  </span>
+                </button>
+                <button onClick={fetchBookings} className="text-sm bg-white text-slate-700 px-4 py-2 rounded-lg font-bold hover:bg-slate-50 transition-colors border border-slate-200 shadow-sm uppercase">
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> รีเฟรชข้อมูล
+                  </span>
+                </button>
+              </div>
             </div>
     
             {bookings.length === 0 ? (

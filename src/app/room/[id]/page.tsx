@@ -101,10 +101,10 @@ function BookingContent({ roomId }: { roomId: string }) {
           }
         }
 
-        // คิวรอเวลาเข้า
+        // คิวรอเวลาเข้า (ให้ 4 คนแรกเข้าได้เลย คนที่ 5 ค่อยเริ่มดีเลย์)
         let target = start;
-        if (queueRank && queueRank > 0) {
-           target = start + (queueRank - 1) * 5000; // ห่างกันคิวละ 5 วิ
+        if (queueRank && queueRank > 4) {
+           target = start + (queueRank - 4) * 5000; // ห่างกันคิวละ 5 วิ
         }
 
         const distance = target - now;
@@ -148,6 +148,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
   const joinQueue = async () => {
     if (!studentName.trim()) return showAlert('กรุณากรอกชื่อก่อนเข้าคิว');
+    if (!/^\d+_.+$/.test(studentName.trim())) return showAlert('กรุณากรอกในรูปแบบ เลขที่_ชื่อจริง เช่น 01_สมชาย');
     
     // Check if user already booked
     const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
@@ -186,6 +187,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
   const confirmBooking = async () => {
     if (!studentName.trim()) return showAlert('กรุณากรอกชื่อก่อนครับ');
+    if (!/^\d+_.+$/.test(studentName.trim())) return showAlert('กรุณากรอกในรูปแบบ เลขที่_ชื่อจริง เช่น 01_สมชาย');
     if (!selectedSeat) return showAlert('กรุณาเลือกที่นั่งบนแผนผัง');
 
     // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
@@ -308,7 +310,7 @@ function BookingContent({ roomId }: { roomId: string }) {
                        type="text"
                        value={studentName}
                        onChange={(e) => setStudentName(e.target.value)}
-                       placeholder="ชื่อของคุณ"
+                       placeholder="เลขที่_ชื่อจริง (เช่น 01_สมชาย)"
                        className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none font-bold text-center mb-4 text-slate-900 transition-all text-lg"
                     />
                     <button onClick={joinQueue} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl transition-colors uppercase tracking-widest shadow-lg shadow-red-600/30 hover:-translate-y-1">
@@ -323,7 +325,7 @@ function BookingContent({ roomId }: { roomId: string }) {
                   <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
       
                   {timeLeft && (
-                    <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+                    <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] mb-8">
                       {timeLeft.h > 0 && (
                         <>
                           <span>{timeLeft.h.toString().padStart(2, '0')}</span>
@@ -335,6 +337,19 @@ function BookingContent({ roomId }: { roomId: string }) {
                       <span className="text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{timeLeft.s.toString().padStart(2, '0')}</span>
                     </div>
                   )}
+
+                  {/* แถบโหลดวิ่งไปวิ่งมาแนวบัตรคอน */}
+                  <div className="w-full max-w-md bg-slate-800 rounded-full h-3 md:h-4 overflow-hidden relative shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+                    <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-600 via-orange-500 to-red-600 rounded-full w-[50%] animate-[progress-slide_2s_ease-in-out_infinite_alternate]" />
+                    {/* CSS Animation (Inline) */}
+                    <style dangerouslySetInnerHTML={{__html: `
+                      @keyframes progress-slide {
+                        0% { transform: translateX(0%); }
+                        100% { transform: translateX(100%); }
+                      }
+                    `}} />
+                  </div>
+                  <p className="text-slate-400 mt-4 text-xs md:text-sm tracking-widest uppercase">กรุณารอสักครู่ ห้ามปิดหน้านี้</p>
                  </>
               )}
             </div>
