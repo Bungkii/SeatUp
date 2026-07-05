@@ -38,7 +38,8 @@ export default function ClassroomCanvas({
     deskType: 'single' as 'single' | 'double' | 'gala',
     layoutDirection: 'horizontal' as 'horizontal' | 'vertical', // แนวนอน หรือ แนวตั้ง/แนวลึก
     spacingX: 40,
-    spacingY: 40
+    spacingY: 40,
+    deskPrefix: 'T'
   });
 
   useEffect(() => {
@@ -207,7 +208,7 @@ export default function ClassroomCanvas({
 
   // ฟังก์ชันจัดโต๊ะอัตโนมัติ (Auto-Layout)
   const handleAutoLayout = async () => {
-    const { totalDesks, desksPerRow, deskType, layoutDirection, spacingX, spacingY } = autoLayoutConfig;
+    const { totalDesks, desksPerRow, deskType, layoutDirection, spacingX, spacingY, deskPrefix } = autoLayoutConfig;
     const newDesks = [];
     const safeItemsPerRow = Math.max(1, desksPerRow); // ป้องกันหาร 0
 
@@ -273,7 +274,7 @@ export default function ClassroomCanvas({
         newDesks.push({
           id: `T${Date.now()}_${i}`,
           x, y,
-          label: `T${i + 1}`,
+          label: `${deskPrefix}${i + 1}`,
           isLocked: false,
           isObject: false
         });
@@ -770,6 +771,11 @@ export default function ClassroomCanvas({
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ระยะห่างแนวลึก (Y)</label>
                   <input type="number" value={autoLayoutConfig.spacingY} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, spacingY: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ชื่อนำหน้าโต๊ะ (เช่น T, A, B)</label>
+                <input type="text" value={autoLayoutConfig.deskPrefix} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, deskPrefix: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
               </div>
             </div>
 

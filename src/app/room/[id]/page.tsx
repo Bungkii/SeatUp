@@ -490,7 +490,10 @@ function BookingContent({ roomId }: { roomId: string }) {
 
                 {/* ปุ่มปิด */}
                 <button
-                  onClick={() => setShowConfirmation(false)}
+                  onClick={() => {
+                    setShowConfirmation(false);
+                    router.push('/');
+                  }}
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-bold text-lg uppercase tracking-wider shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
                   เข้าใจแล้ว ปิดหน้านี้
