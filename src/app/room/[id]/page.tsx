@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic';
 import { DialogProvider, useDialog } from '@/components/DialogContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled from 'styled-components';
-import html2canvas from 'html2canvas';
 
 const StyledConfirmButton = styled.button`
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
@@ -320,49 +319,59 @@ function BookingContent({ roomId }: { roomId: string }) {
     if (!selectedSeat) return showAlert('กรุณาเลือกที่นั่งบนแผนผัง');
     if (isBooking) return; // ป้องกันกดซ้ำขณะกำลังจอง
 
-    // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
-    const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
-    if (hasBooked) {
-      return showAlert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
-    }
-
-    // เช็คว่าโต๊ะนี้ถูกจองไปแล้วหรือยัง (real-time check จาก state ล่าสุด)
-    const seatTaken = bookings.some(b => b.desk_id === selectedSeat);
-    if (seatTaken) {
-      setSelectedSeat(null);
-      return showAlert('ที่นั่งนี้ถูกจองไปแล้ว กรุณาเลือกที่นั่งอื่น');
-    }
-
-    setIsBooking(true);
-
-    const { error } = await supabase.from('bookings').insert([{
-      room_id: room.id,
-      desk_id: selectedSeat,
-      user_name: studentName,
-    }]);
-
-    if (error) {
-      setIsBooking(false);
-      if (error.code === '23505') { // รหัส Error 23505 = ข้อมูลซ้ำ (Unique Violation)
-        setSelectedSeat(null);
-        showAlert('ที่นั่งนี้ถูกจองตัดหน้าไปแล้ว กรุณาเลือกที่นั่งอื่น');
-      } else {
-        showAlert('Error: ' + error.message);
+    try {
+      // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
+      const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
+      if (hasBooked) {
+        return showAlert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
       }
-    } else {
-      // ลบออกจากคิวเมื่อจองสำเร็จเพื่อให้คิวเลื่อนสำหรับคนอื่น
-      await supabase.from('room_queues').delete().eq('room_id', room.id).eq('user_name', studentName);
 
-      // จองสำเร็จ → แสดงหน้ายืนยันการจอง (Confirmation Card)
-      setConfirmedBooking({
-        deskId: selectedSeat,
-        userName: studentName,
-        roomName: room.name,
-        time: new Date().toLocaleString('th-TH', { dateStyle: 'full', timeStyle: 'short' }),
-      });
-      setShowConfirmation(true);
-      setSelectedSeat(null);
+      // เช็คว่าโต๊ะนี้ถูกจองไปแล้วหรือยัง (real-time check จาก state ล่าสุด)
+      const seatTaken = bookings.some(b => b.desk_id === selectedSeat);
+      if (seatTaken) {
+        setSelectedSeat(null);
+        return showAlert('ที่นั่งนี้ถูกจองไปแล้ว กรุณาเลือกที่นั่งอื่น');
+      }
+
+      setIsBooking(true);
+
+      const { error } = await supabase.from('bookings').insert([{
+        room_id: room.id,
+        desk_id: selectedSeat,
+        user_name: studentName,
+      }]);
+
+      if (error) {
+        setIsBooking(false);
+        if (error.code === '23505') { // รหัส Error 23505 = ข้อมูลซ้ำ (Unique Violation)
+          setSelectedSeat(null);
+          showAlert('ที่นั่งนี้ถูกจองตัดหน้าไปแล้ว กรุณาเลือกที่นั่งอื่น');
+        } else {
+          showAlert('Error: ' + error.message);
+        }
+      } else {
+        // ลบออกจากคิวเมื่อจองสำเร็จเพื่อให้คิวเลื่อนสำหรับคนอื่น
+        await supabase.from('room_queues').delete().eq('room_id', room.id).eq('user_name', studentName);
+
+        // หาเวลาปัจจุบันที่แน่นอน
+        const d = new Date();
+        const timeString = d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH');
+
+        // จองสำเร็จ → แสดงหน้ายืนยันการจอง (Confirmation Card)
+        setConfirmedBooking({
+          deskId: selectedSeat,
+          userName: studentName,
+          roomName: room?.name || 'Unknown Room',
+          time: timeString,
+        });
+        setShowConfirmation(true);
+        setSelectedSeat(null);
+        setIsBooking(false);
+      }
+    } catch (err: any) {
+      console.error(err);
       setIsBooking(false);
+      showAlert('เกิดข้อผิดพลาดที่ไม่คาดคิด: ' + (err?.message || 'Unknown Error'));
     }
   };
 
