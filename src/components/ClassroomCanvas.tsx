@@ -32,8 +32,11 @@ export default function ClassroomCanvas({
   const [showAutoLayoutModal, setShowAutoLayoutModal] = useState(false);
   const [autoLayoutConfig, setAutoLayoutConfig] = useState({
     totalDesks: 30,
-    desksPerRow: 5, // จำนวนโต๊ะต่อแถว (แนวนอน)
-    deskType: 'single' as 'single' | 'double' | 'gala'
+    desksPerRow: 5, // จำนวนโต๊ะต่อแถว (แนวนอน หรือ แนวลึก)
+    deskType: 'single' as 'single' | 'double' | 'gala',
+    layoutDirection: 'horizontal' as 'horizontal' | 'vertical', // แนวนอน หรือ แนวตั้ง/แนวลึก
+    spacingX: 40,
+    spacingY: 40
   });
 
   useEffect(() => {
@@ -192,10 +195,8 @@ export default function ClassroomCanvas({
 
   // ฟังก์ชันจัดโต๊ะอัตโนมัติ (Auto-Layout)
   const handleAutoLayout = async () => {
-    const { totalDesks, desksPerRow, deskType } = autoLayoutConfig;
+    const { totalDesks, desksPerRow, deskType, layoutDirection, spacingX, spacingY } = autoLayoutConfig;
     const newDesks = [];
-    const spacingX = 40; // เพิ่มระยะห่างเป็น 40px (2 ช่อง Grid) ให้เท่ากันชัดเจน
-    const spacingY = 40;
     const safeItemsPerRow = Math.max(1, desksPerRow); // ป้องกันหาร 0
 
     let startX = 60;
@@ -204,11 +205,13 @@ export default function ClassroomCanvas({
     // คำนวณความกว้างรวมเพื่อหาจุดเริ่มต้นกึ่งกลาง
     let totalWidth = 0;
     if (deskType === 'single') {
-      const cols = Math.min(totalDesks, safeItemsPerRow);
+      const itemsInRow = layoutDirection === 'horizontal' ? safeItemsPerRow : Math.ceil(totalDesks / safeItemsPerRow);
+      const cols = Math.min(totalDesks, itemsInRow);
       totalWidth = cols * deskWidth + Math.max(0, cols - 1) * spacingX;
     } else {
       const totalPairs = Math.ceil(totalDesks / 2);
-      const cols = Math.min(totalPairs, safeItemsPerRow);
+      const itemsInRow = layoutDirection === 'horizontal' ? safeItemsPerRow : Math.ceil(totalPairs / safeItemsPerRow);
+      const cols = Math.min(totalPairs, itemsInRow);
       totalWidth = cols * (2 * deskWidth) + Math.max(0, cols - 1) * spacingX;
     }
     startX = Math.max(60, (dimensions.width - totalWidth) / 2);
@@ -218,8 +221,13 @@ export default function ClassroomCanvas({
       let row, col, x = 0, y = 0;
 
       if (deskType === 'single') {
-        col = i % safeItemsPerRow; // จัดเรียงแนวนอนทีละแถว
-        row = Math.floor(i / safeItemsPerRow);
+        if (layoutDirection === 'horizontal') {
+          col = i % safeItemsPerRow; // จัดเรียงแนวนอนทีละแถว
+          row = Math.floor(i / safeItemsPerRow);
+        } else {
+          row = i % safeItemsPerRow; // จัดเรียงแนวลึก/แนวตั้งทีละคอลัมน์
+          col = Math.floor(i / safeItemsPerRow);
+        }
         
         x = startX + col * (deskWidth + spacingX);
         y = startY + row * (deskHeight + spacingY);
@@ -228,8 +236,13 @@ export default function ClassroomCanvas({
         const pairIndex = Math.floor(i / 2);
         const isSecondInPair = i % 2 !== 0;
         
-        col = pairIndex % safeItemsPerRow;
-        row = Math.floor(pairIndex / safeItemsPerRow);
+        if (layoutDirection === 'horizontal') {
+          col = pairIndex % safeItemsPerRow;
+          row = Math.floor(pairIndex / safeItemsPerRow);
+        } else {
+          row = pairIndex % safeItemsPerRow;
+          col = Math.floor(pairIndex / safeItemsPerRow);
+        }
 
         x = startX + col * (2 * deskWidth + spacingX);
         if (isSecondInPair) x += deskWidth; // โต๊ะคู่ตัวที่สองติดกับตัวแรก
@@ -650,22 +663,46 @@ export default function ClassroomCanvas({
                   <input type="number" value={autoLayoutConfig.totalDesks} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, totalDesks: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะต่อแถว (แนวนอน)</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะต่อแถว</label>
                   <input type="number" value={autoLayoutConfig.desksPerRow} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, desksPerRow: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ประเภทโต๊ะ</label>
-                <select
-                  value={autoLayoutConfig.deskType}
-                  onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, deskType: e.target.value as 'single' | 'double' | 'gala'})}
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
-                >
-                  <option value="single">โต๊ะเดี่ยว (Single)</option>
-                  <option value="double">โต๊ะคู่ (Double)</option>
-                  <option value="gala">ราตรีสัมพันธ์ (โต๊ะกลม A-K)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ทิศทางการเรียงโต๊ะ</label>
+                  <select
+                    value={autoLayoutConfig.layoutDirection}
+                    onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, layoutDirection: e.target.value as 'horizontal' | 'vertical'})}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
+                  >
+                    <option value="horizontal">แนวยาว (ซ้ายไปขวา)</option>
+                    <option value="vertical">แนวลึก (บนลงล่าง)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ประเภทโต๊ะ</label>
+                  <select
+                    value={autoLayoutConfig.deskType}
+                    onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, deskType: e.target.value as 'single' | 'double' | 'gala'})}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
+                  >
+                    <option value="single">โต๊ะเดี่ยว (Single)</option>
+                    <option value="double">โต๊ะคู่ (Double)</option>
+                    <option value="gala">ราตรีสัมพันธ์ (โต๊ะกลม A-K)</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ระยะห่างแนวยาว (X)</label>
+                  <input type="number" value={autoLayoutConfig.spacingX} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, spacingX: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ระยะห่างแนวลึก (Y)</label>
+                  <input type="number" value={autoLayoutConfig.spacingY} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, spacingY: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                </div>
               </div>
             </div>
 
