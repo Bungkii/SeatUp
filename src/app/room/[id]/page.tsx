@@ -69,7 +69,11 @@ function BookingContent({ roomId }: { roomId: string }) {
         channel = supabase
           .channel(`public:bookings:${roomData.id}-${Date.now()}`)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
-            setBookings(prev => [...prev, payload.new]); // นำคนจองใหม่ต่อท้ายได้เลย
+            setBookings(prev => {
+              // ป้องกันข้อมูลซ้ำ: เช็คว่ามี desk_id นี้อยู่แล้วหรือไม่
+              if (prev.some(b => b.desk_id === payload.new.desk_id)) return prev;
+              return [...prev, payload.new];
+            }); // นำคนจองใหม่ต่อท้ายได้เลย
           })
           .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
             setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
@@ -217,15 +221,30 @@ function BookingContent({ roomId }: { roomId: string }) {
     setSelectedSeat(deskLabel); // เก็บค่าโต๊ะที่เลือก
   };
 
+  // === State สำหรับหน้ายืนยันการจอง (Confirmation Modal) ===
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState<{ deskId: string; userName: string; roomName: string; time: string } | null>(null);
+  const [isBooking, setIsBooking] = useState(false);
+
   const confirmBooking = async () => {
     if (!studentName.trim()) return showAlert('กรุณากรอกชื่อก่อนครับ');
     if (!selectedSeat) return showAlert('กรุณาเลือกที่นั่งบนแผนผัง');
+    if (isBooking) return; // ป้องกันกดซ้ำขณะกำลังจอง
 
     // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
     const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
     if (hasBooked) {
       return showAlert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
     }
+
+    // เช็คว่าโต๊ะนี้ถูกจองไปแล้วหรือยัง (real-time check จาก state ล่าสุด)
+    const seatTaken = bookings.some(b => b.desk_id === selectedSeat);
+    if (seatTaken) {
+      setSelectedSeat(null);
+      return showAlert('ที่นั่งนี้ถูกจองไปแล้ว กรุณาเลือกที่นั่งอื่น');
+    }
+
+    setIsBooking(true);
 
     const { error } = await supabase.from('bookings').insert([{
       room_id: room.id,
@@ -234,14 +253,24 @@ function BookingContent({ roomId }: { roomId: string }) {
     }]);
 
     if (error) {
+      setIsBooking(false);
       if (error.code === '23505') { // รหัส Error 23505 = ข้อมูลซ้ำ (Unique Violation)
-        showAlert('ที่นั่งนี้ถูกจองตัดหน้าไปแล้ว');
+        setSelectedSeat(null);
+        showAlert('ที่นั่งนี้ถูกจองตัดหน้าไปแล้ว กรุณาเลือกที่นั่งอื่น');
       } else {
         showAlert('Error: ' + error.message);
       }
     } else {
-      showAlert('จองที่นั่งสำเร็จ!');
-      setSelectedSeat(null); // ไม่ต้องรีเฟรชหน้าจอแล้ว เพราะ Realtime จะอัปเดตแผนผังให้เอง
+      // จองสำเร็จ → แสดงหน้ายืนยันการจอง (Confirmation Card)
+      setConfirmedBooking({
+        deskId: selectedSeat,
+        userName: studentName,
+        roomName: room.name,
+        time: new Date().toLocaleString('th-TH', { dateStyle: 'full', timeStyle: 'short' }),
+      });
+      setShowConfirmation(true);
+      setSelectedSeat(null);
+      setIsBooking(false);
     }
   };
 
@@ -306,10 +335,10 @@ function BookingContent({ roomId }: { roomId: string }) {
   
              <button 
                onClick={confirmBooking}
-               disabled={showOverlay}
+               disabled={showOverlay || isBooking}
                className="flex-1 lg:w-full shrink-0 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-3 lg:py-4 px-2 lg:px-0 rounded-lg font-bold text-sm lg:text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 whitespace-nowrap"
              >
-               {showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
+               {isBooking ? 'กำลังจอง...' : showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
              </button>
              
              <button onClick={() => router.push('/')} className="hidden lg:flex mt-4 py-3 lg:py-0 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors items-center justify-center gap-2 w-full">
@@ -382,6 +411,81 @@ function BookingContent({ roomId }: { roomId: string }) {
                   )}
                  </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== BOOKING CONFIRMATION MODAL — หน้ายืนยันการจองสำเร็จ ===== */}
+        {showConfirmation && confirmedBooking && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 p-4">
+            <div id="booking-confirmation-card" className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-500">
+              {/* Header สีเขียว */}
+              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-center relative overflow-hidden">
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
+                  <div className="absolute bottom-0 right-0 w-60 h-60 bg-white rounded-full translate-x-1/3 translate-y-1/3" />
+                </div>
+                {/* Animated Checkmark */}
+                <div className="relative z-10 mb-4 flex justify-center">
+                  <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-in zoom-in duration-700">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <h2 className="text-2xl font-black text-white uppercase tracking-wider relative z-10">จองสำเร็จแล้ว!</h2>
+                <p className="text-emerald-100 text-sm mt-1 relative z-10">Booking Confirmed</p>
+              </div>
+
+              {/* รายละเอียดการจอง */}
+              <div className="p-6 space-y-4">
+                <div className="bg-slate-50 rounded-2xl p-5 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 font-medium">🏫 ห้อง</span>
+                    <span className="font-bold text-slate-900">{confirmedBooking.roomName}</span>
+                  </div>
+                  <div className="border-t border-dashed border-slate-200" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 font-medium">💺 ที่นั่ง</span>
+                    <span className="font-black text-3xl text-emerald-600">{confirmedBooking.deskId}</span>
+                  </div>
+                  <div className="border-t border-dashed border-slate-200" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 font-medium">👤 ชื่อผู้จอง</span>
+                    <span className="font-bold text-slate-900">{confirmedBooking.userName}</span>
+                  </div>
+                  <div className="border-t border-dashed border-slate-200" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 font-medium">📅 วัน/เวลา</span>
+                    <span className="font-medium text-slate-700 text-xs">{confirmedBooking.time}</span>
+                  </div>
+                </div>
+
+                {/* รหัสอ้างอิง */}
+                <div className="text-center py-2">
+                  <span className="text-xs text-slate-400 font-mono tracking-widest">REF: {room.join_code || room.id.slice(0,8).toUpperCase()}</span>
+                </div>
+
+                {/* คำแนะนำ */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                  <p className="text-amber-700 text-xs font-bold">
+                    📸 กรุณาแคปหน้าจอนี้ไว้เพื่อเป็นหลักฐานการจอง
+                  </p>
+                </div>
+
+                {/* ปุ่มปิด */}
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-bold text-lg uppercase tracking-wider shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                >
+                  เข้าใจแล้ว ปิดหน้านี้
+                </button>
+              </div>
+
+              {/* Footer */}
+              <div className="bg-slate-50 py-3 text-center border-t border-slate-100">
+                <span className="text-xs text-slate-400 font-bold tracking-widest uppercase">JongTee Booking System</span>
+              </div>
             </div>
           </div>
         )}
