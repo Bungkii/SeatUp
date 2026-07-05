@@ -441,22 +441,22 @@ function BookingContent({ roomId }: { roomId: string }) {
               <div className="p-6 space-y-4">
                 <div className="bg-slate-50 rounded-2xl p-5 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-500 font-medium">🏫 ห้อง</span>
+                    <span className="text-sm text-slate-500 font-medium flex items-center gap-1.5"><i className="bi bi-building"></i> ห้อง</span>
                     <span className="font-bold text-slate-900">{confirmedBooking.roomName}</span>
                   </div>
                   <div className="border-t border-dashed border-slate-200" />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-500 font-medium">💺 ที่นั่ง</span>
+                    <span className="text-sm text-slate-500 font-medium flex items-center gap-1.5"><i className="bi bi-grid-1x2"></i> ที่นั่ง</span>
                     <span className="font-black text-3xl text-emerald-600">{confirmedBooking.deskId}</span>
                   </div>
                   <div className="border-t border-dashed border-slate-200" />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-500 font-medium">👤 ชื่อผู้จอง</span>
+                    <span className="text-sm text-slate-500 font-medium flex items-center gap-1.5"><i className="bi bi-person"></i> ชื่อผู้จอง</span>
                     <span className="font-bold text-slate-900">{confirmedBooking.userName}</span>
                   </div>
                   <div className="border-t border-dashed border-slate-200" />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-500 font-medium">📅 วัน/เวลา</span>
+                    <span className="text-sm text-slate-500 font-medium flex items-center gap-1.5"><i className="bi bi-calendar-event"></i> วัน/เวลา</span>
                     <span className="font-medium text-slate-700 text-xs">{confirmedBooking.time}</span>
                   </div>
                 </div>
@@ -469,7 +469,7 @@ function BookingContent({ roomId }: { roomId: string }) {
                 {/* คำแนะนำ */}
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
                   <p className="text-amber-700 text-xs font-bold">
-                    📸 กรุณาแคปหน้าจอนี้ไว้เพื่อเป็นหลักฐานการจอง
+                    <i className="bi bi-camera"></i> กรุณาแคปหน้าจอนี้ไว้เพื่อเป็นหลักฐานการจอง
                   </p>
                 </div>
 
