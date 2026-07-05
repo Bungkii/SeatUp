@@ -323,13 +323,22 @@ function BookingContent({ roomId }: { roomId: string }) {
                    <span className="text-slate-400">ห้องเรียน</span>
                    <span className="font-bold text-slate-900">{room?.name || 'กำลังโหลด...'}</span>
                 </div>
+                
+                {/* ช่องกรอกชื่อผู้จอง */}
+                <div className="flex flex-col lg:border-b lg:pb-3 w-full">
+                   <label className="text-[10px] lg:text-sm text-slate-500 lg:text-slate-400 font-bold uppercase tracking-wider mb-1">ชื่อผู้จอง</label>
+                   <input 
+                     type="text"
+                     value={studentName}
+                     onChange={(e) => setStudentName(e.target.value)}
+                     placeholder="กรอกชื่อ-นามสกุล"
+                     className="w-full p-2 lg:p-3 rounded-lg border-2 border-slate-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/10 outline-none font-bold text-slate-900 transition-all text-sm lg:text-base"
+                   />
+                </div>
+
                 <div className="flex flex-col lg:flex-row lg:justify-between items-center lg:border-b lg:pb-2 gap-0.5 lg:gap-0">
                    <span className="text-[10px] lg:text-sm text-slate-500 lg:text-slate-400 font-bold uppercase tracking-wider">โต๊ะที่เลือก</span>
                    <span className="text-red-600 font-black text-xl lg:text-xl leading-none">{selectedSeat || '-'}</span>
-                </div>
-                <div className="hidden lg:flex flex-col text-right lg:text-left lg:flex-row lg:justify-between lg:items-center lg:pt-2">
-                   <span className="text-xs lg:text-sm text-slate-500 lg:text-slate-400 font-bold">ชื่อผู้จอง</span>
-                   <span className="font-bold text-slate-900 text-sm lg:text-base">{studentName || '-'}</span>
                 </div>
              </div>
   
