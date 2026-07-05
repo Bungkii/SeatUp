@@ -152,6 +152,67 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     document.body.removeChild(link);
   };
 
+  // 4. ฟังก์ชันบันทึกชื่อการยืนยันหลังการจอง
+  const handleConfirmName = async (bookingId: string) => {
+    const name = prompt('กรุณากรอกชื่อการยืนยัน (เช่น ชื่อกิจกรรมหรือรหัสอ้างอิง)');
+    if (!name) return;
+    const { error } = await supabase.from('bookings').update({ confirmation_name: name }).eq('id', bookingId);
+    if (error) {
+      alert('บันทึกชื่อการยืนยันไม่สำเร็จ: ' + error.message);
+    } else {
+      fetchBookings();
+    }
+  };
+
+  // 5. ฟังก์ชันเพิ่ม Zone (แบ่งโซน) สำหรับห้อง
+  const handleAddZone = async () => {
+    const zoneName = prompt('ชื่อโซน (เช่น "เวที", "ประตู", "หน้าจอ")');
+    if (!zoneName) return;
+    const condition = prompt('เงื่อนไขสำหรับโซนนี้ (ใส่ข้อความอธิบาย)');
+    const { error } = await supabase.from('room_zones').insert({ room_id: room.id, zone_name: zoneName, condition_text: condition });
+    if (error) {
+      alert('เพิ่มโซนไม่สำเร็จ: ' + error.message);
+    } else {
+      fetchZones();
+    }
+  };
+
+  // 6. ดึงรายการโซนของห้องนี้
+  const [zones, setZones] = useState<any[]>([]);
+  const fetchZones = async () => {
+    const { data, error } = await supabase.from('room_zones').select('*').eq('room_id', room.id);
+    if (error) {
+      console.error('โหลดโซนไม่สำเร็จ', error);
+    } else {
+      setZones(data || []);
+    }
+  };
+
+  useEffect(() => {
+    if (room?.id) {
+      fetchZones();
+    }
+  }, [room?.id]);
+
+  // UI panel for zones
+  const zonePanel = (
+    <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-lg font-bold text-slate-800">โซน (Zones)</h3>
+        <button onClick={handleAddZone} className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1 rounded-md hover:bg-indigo-100">+ เพิ่มโซน</button>
+      </div>
+      {zones.length === 0 ? (
+        <p className="text-sm text-slate-500">ยังไม่มีโซนกำหนด</p>
+      ) : (
+        <ul className="list-disc list-inside text-sm text-slate-700">
+          {zones.map(z => (
+            <li key={z.id}> <strong>{z.zone_name}</strong>: {z.condition_text || 'ไม่มีเงื่อนไข'}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex-1 flex flex-col md:space-y-6 h-full relative">
       {/* โหมดมือถือ: ปุ่มลอยสำหรับเปิดเมนู Settings */}
@@ -278,6 +339,8 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
               </div>
             </div>
     
+            {zonePanel}
+
             {bookings.length === 0 ? (
               <div className="bg-slate-50 rounded-2xl p-10 text-center text-slate-400 font-bold">ยังไม่มีผู้จองที่นั่งในขณะนี้</div>
             ) : (
@@ -288,6 +351,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
                       <th className="p-4 font-bold">เวลาที่จอง</th>
                       <th className="p-4 font-bold">หมายเลขโต๊ะ</th>
                       <th className="p-4 font-bold">ชื่อ-นามสกุล</th>
+                      <th className="p-4 font-bold">ชื่อยืนยัน</th>
                       <th className="p-4 font-bold text-right">จัดการ</th>
                     </tr>
                   </thead>
@@ -297,6 +361,15 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
                         <td className="p-4 text-sm text-slate-500">{new Date(b.created_at).toLocaleString('th-TH')}</td>
                         <td className="p-4 font-bold text-slate-900">{b.desk_id}</td>
                         <td className="p-4 font-medium text-slate-700">{b.user_name}</td>
+                        <td className="p-4 text-sm text-slate-600">
+                          {b.confirmation_name ? (
+                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-bold">{b.confirmation_name}</span>
+                          ) : (
+                            <button onClick={() => handleConfirmName(b.id)} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200">
+                              + กำหนดชื่อ
+                            </button>
+                          )}
+                        </td>
                         <td className="p-4 text-right">
                           <button 
                             onClick={() => handleDeleteBooking(b.id)} 
