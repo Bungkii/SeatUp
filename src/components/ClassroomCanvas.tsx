@@ -33,7 +33,7 @@ export default function ClassroomCanvas({
   const [autoLayoutConfig, setAutoLayoutConfig] = useState({
     totalDesks: 30,
     desksPerRow: 5, // จำนวนโต๊ะต่อแถว (แนวนอน)
-    deskType: 'single' as 'single' | 'double'
+    deskType: 'single' as 'single' | 'double' | 'ratree'
   });
 
   useEffect(() => {
@@ -578,11 +578,11 @@ export default function ClassroomCanvas({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะทั้งหมด</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">{autoLayoutConfig.deskType === 'ratree' ? 'จำนวนกลุ่มโต๊ะ (เช่น 11 = A ถึง K)' : 'จำนวนโต๊ะทั้งหมด'}</label>
                   <input type="number" value={autoLayoutConfig.totalDesks} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, totalDesks: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะต่อแถว (แนวนอน)</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">{autoLayoutConfig.deskType === 'ratree' ? 'จำนวนกลุ่มต่อแถว (แนวนอน)' : 'จำนวนโต๊ะต่อแถว (แนวนอน)'}</label>
                   <input type="number" value={autoLayoutConfig.desksPerRow} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, desksPerRow: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
               </div>
@@ -591,11 +591,19 @@ export default function ClassroomCanvas({
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ประเภทโต๊ะ</label>
                 <select
                   value={autoLayoutConfig.deskType}
-                  onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, deskType: e.target.value as 'single' | 'double'})}
+                  onChange={(e) => {
+                    const newType = e.target.value as 'single' | 'double' | 'ratree';
+                    setAutoLayoutConfig({
+                      ...autoLayoutConfig, 
+                      deskType: newType,
+                      ...(newType === 'ratree' ? { totalDesks: 11, desksPerRow: 3 } : {})
+                    });
+                  }}
                   className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
                 >
                   <option value="single">โต๊ะเดี่ยว (Single)</option>
                   <option value="double">โต๊ะคู่ (Double)</option>
+                  <option value="ratree">ราตรีสัมพันธ์ (กลุ่มละ 8 ที่นั่ง)</option>
                 </select>
               </div>
             </div>
