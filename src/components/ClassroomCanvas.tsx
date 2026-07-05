@@ -6,6 +6,7 @@ import { Stage, Layer, Rect, Text, Group, Path } from 'react-konva';
 interface ClassroomCanvasProps {
   initialLayout: any[];
   bookings?: any[]; // เพิ่ม Prop รับข้อมูลการจอง
+  zones?: any[]; // เพิ่ม Prop รับข้อมูล Zone
   onSave: (data: any) => void;
   isReadOnly?: boolean;
 }
@@ -13,6 +14,7 @@ interface ClassroomCanvasProps {
 export default function ClassroomCanvas({ 
   initialLayout, 
   bookings = [], // กำหนดค่าเริ่มต้นเป็นอาเรย์ว่าง
+  zones = [],
   onSave, 
   isReadOnly = false 
 }: ClassroomCanvasProps) {
@@ -132,12 +134,18 @@ export default function ClassroomCanvas({
         const margin = 10; // ระยะยืดหยุ่นยอมให้ขอบซ้อนทับกันได้ 10px
         const isColliding = desks.some((d: any) => {
           if (d.id === id) return false; // ไม่เช็กตัวเอง
+          
+          const dW = d.width || deskWidth;
+          const dH = d.height || deskHeight;
+          const currentW = desks.find((od: any) => od.id === id)?.width || deskWidth;
+          const currentH = desks.find((od: any) => od.id === id)?.height || deskHeight;
+
           // ค้นหาว่าขอบของโต๊ะทับกันหรือไม่ (หักลบ margin ออก)
           return (
-            newX + margin < d.x + deskWidth - margin &&
-            newX + deskWidth - margin > d.x + margin &&
-            newY + margin < d.y + deskHeight - margin &&
-            newY + deskHeight - margin > d.y + margin
+            newX + margin < d.x + dW - margin &&
+            newX + currentW - margin > d.x + margin &&
+            newY + margin < d.y + dH - margin &&
+            newY + currentH - margin > d.y + margin
           );
         });
 
@@ -172,10 +180,14 @@ export default function ClassroomCanvas({
         
         // หาตำแหน่งที่ว่างเพื่อไม่ให้โต๊ะเกิดมาทับกัน
         while (isOccupied) {
-          isOccupied = desks.some((d: any) => (
-            newX + margin < d.x + deskWidth - margin && newX + deskWidth - margin > d.x + margin &&
-            newY + margin < d.y + deskHeight - margin && newY + deskHeight - margin > d.y + margin
-          ));
+          isOccupied = desks.some((d: any) => {
+            const dW = d.width || deskWidth;
+            const dH = d.height || deskHeight;
+            return (
+              newX + margin < d.x + dW - margin && newX + deskWidth - margin > d.x + margin &&
+              newY + margin < d.y + dH - margin && newY + deskHeight - margin > d.y + margin
+            )
+          });
           if (isOccupied) {
             newX += 20;
             newY += 20;
@@ -432,6 +444,10 @@ export default function ClassroomCanvas({
               strokeColor = '#94A3B8';
             }
 
+            const currentW = desk.width || deskWidth;
+            const currentH = desk.height || deskHeight;
+            const zoneName = desk.zoneId && zones.length > 0 ? zones.find(z => z.id === desk.zoneId)?.zone_name : null;
+
             return (
               <Group
                 key={desk.id}
@@ -493,8 +509,8 @@ export default function ClassroomCanvas({
               >
                 {/* ตัวโต๊ะ */}
                 <Rect
-                  width={deskWidth}
-                  height={deskHeight}
+                  width={currentW}
+                  height={currentH}
                   fill={fillColor}
                   stroke={strokeColor}
                   strokeWidth={2}
@@ -522,7 +538,7 @@ export default function ClassroomCanvas({
                 {!desk.isObject && (
                   <Text
                     text={desk.label}
-                    x={deskWidth - 25} // ชิดมุมขวาบน
+                    x={currentW - 25} // ชิดมุมขวาบน
                     y={5}
                     fontSize={10}
                     fontStyle="bold"
@@ -535,10 +551,10 @@ export default function ClassroomCanvas({
                 {/* ชื่อผู้จอง หรือชื่อสิ่งของ (แสดงตรงกลางโต๊ะ) */}
                 <Text
                   text={desk.isObject ? desk.label : (isBooked ? ownerName : 'ว่าง')} 
-                  width={deskWidth - 10} // เว้นขอบ
-                  height={deskHeight - 15}
+                  width={currentW - 10} // เว้นขอบ
+                  height={currentH - 15}
                   x={5}
-                  y={12} // ขยับลงมาหน่อย
+                  y={currentH / 2 - 6} // ให้อยู่ตรงกลางมากขึ้น
                   align="center"
                   verticalAlign="middle"
                   fontSize={12}
@@ -550,6 +566,20 @@ export default function ClassroomCanvas({
                   listening={false}
                   perfectDrawEnabled={false}
                 />
+
+                {/* แสดงป้ายโซนถ้ามี */}
+                {zoneName && (
+                  <Text
+                    text={`[${zoneName}]`}
+                    x={5}
+                    y={currentH - 15}
+                    fontSize={9}
+                    fontStyle="bold"
+                    fill="#F59E0B"
+                    listening={false}
+                    perfectDrawEnabled={false}
+                  />
+                )}
               </Group>
             );
           })}
@@ -578,6 +608,43 @@ export default function ClassroomCanvas({
                   className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ความกว้าง</label>
+                  <input
+                    type="number"
+                    value={editingDesk.width || deskWidth}
+                    onChange={(e) => setEditingDesk({...editingDesk, width: parseInt(e.target.value) || deskWidth})}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ความสูง</label>
+                  <input
+                    type="number"
+                    value={editingDesk.height || deskHeight}
+                    onChange={(e) => setEditingDesk({...editingDesk, height: parseInt(e.target.value) || deskHeight})}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {zones.length > 0 && (
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">กำหนดโซน (Zone)</label>
+                  <select
+                    value={editingDesk.zoneId || ''}
+                    onChange={(e) => setEditingDesk({...editingDesk, zoneId: e.target.value})}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
+                  >
+                    <option value="">-- ไม่ระบุโซน --</option>
+                    {zones.map(z => (
+                      <option key={z.id} value={z.id}>{z.zone_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
                 <input

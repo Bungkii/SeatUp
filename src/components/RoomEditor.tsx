@@ -301,6 +301,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
           <ClassroomCanvas 
             initialLayout={room.layout_config} 
             bookings={bookings} // ส่ง bookings ไปให้ Admin เห็นชื่อคนจองบนแผนผังด้วย
+            zones={zones}
             onSave={handleSave} 
             isReadOnly={false}  
           />
@@ -317,6 +318,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
             <ClassroomCanvas 
               initialLayout={room.layout_config} 
               bookings={bookings}
+              zones={zones}
               onSave={() => {}} // Read-only, no action on save
               isReadOnly={true}  
             />

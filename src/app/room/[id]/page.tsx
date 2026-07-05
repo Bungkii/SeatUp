@@ -19,6 +19,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
   const [room, setRoom] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[]>([]);
   const [studentName, setStudentName] = useState(nameFromQuery || '');
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null); // เก็บโต๊ะที่คลิกเลือกอยู่
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,11 @@ function BookingContent({ roomId }: { roomId: string }) {
           const { data: bookingData } = await supabase.from('bookings').select('id, desk_id, user_name').eq('room_id', roomData.id);
           if (bookingData) setBookings(bookingData);
         };
-        await fetchBookings();
+        const fetchZones = async () => {
+          const { data: zoneData } = await supabase.from('room_zones').select('*').eq('room_id', roomData.id);
+          if (zoneData) setZones(zoneData);
+        };
+        await Promise.all([fetchBookings(), fetchZones()]);
 
         // ระบบดักจับ Real-time ยัดข้อมูลใส่ State เองโดยไม่ต้องดึงใหม่จากฐานข้อมูล
         channel = supabase
@@ -296,6 +301,7 @@ function BookingContent({ roomId }: { roomId: string }) {
             <ClassroomCanvas 
               initialLayout={room.layout_config} 
               bookings={bookings} 
+              zones={zones}
               onSave={handleSeatClick} // ส่งฟังก์ชันคลิกเลือกไป
               isReadOnly={true} 
             />
