@@ -66,6 +66,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     let channel: any;
+    let queueChannel: any;
 
     // โหลดชื่อที่เคยเซฟไว้เบื้องต้น (ถ้ามี) เผื่อว่าเข้าด้วยลิงก์เดิม
     if (typeof window !== 'undefined') {
