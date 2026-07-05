@@ -33,7 +33,7 @@ export default function ClassroomCanvas({
   const [autoLayoutConfig, setAutoLayoutConfig] = useState({
     totalDesks: 30,
     desksPerRow: 5, // จำนวนโต๊ะต่อแถว (แนวนอน)
-    deskType: 'single' as 'single' | 'double' | 'ratree'
+    deskType: 'single' as 'single' | 'double' | 'gala'
   });
 
   useEffect(() => {
@@ -237,18 +237,86 @@ export default function ClassroomCanvas({
         y = startY + row * (deskHeight + spacingY);
       }
 
-      // Snap ลง Grid อัตโนมัติเวลาสร้าง
-      if (useMagnetGrid) {
-        x = Math.round(x / 20) * 20;
-        y = Math.round(y / 20) * 20;
-      }
+      // โหมด Single และ Double (Gala ไปอีกบล็อก)
+      if (deskType !== 'gala') {
+        // Snap ลง Grid อัตโนมัติเวลาสร้าง
+        if (useMagnetGrid) {
+          x = Math.round(x / 20) * 20;
+          y = Math.round(y / 20) * 20;
+        }
 
+        newDesks.push({
+          id: `T${Date.now()}_${i}`,
+          x, y,
+          label: `T${i + 1}`,
+          isLocked: false,
+          isObject: false
+        });
+      }
+    }
+
+    if (deskType === 'gala') {
+      const groupNames = ['A','B','C','D','E','F','G','H','I','J','K'];
+      const groupsPerRow = 4;
+      const groupRadius = 90; // รัศมีของโต๊ะกลม
+      const groupSpacingX = 260; // ระยะห่างระหว่างกลุ่มแกน X
+      const groupSpacingY = 260; // ระยะห่างระหว่างกลุ่มแกน Y
+      
+      const totalGroups = groupNames.length;
+      const totalWidthGala = Math.min(totalGroups, groupsPerRow) * groupSpacingX;
+      
+      // หาจุดศูนย์กลางกลุ่มแรก
+      const galaStartX = Math.max(120, (dimensions.width - totalWidthGala) / 2 + 100);
+      const galaStartY = 250; // เว้นที่ด้านบนให้เวที
+
+      // เพิ่มเวที (Stage)
       newDesks.push({
-        id: `T${Date.now()}_${i}`,
-        x, y,
-        label: `T${i + 1}`,
-        isLocked: false,
-        isObject: false
+        id: `STAGE_${Date.now()}`,
+        x: dimensions.width / 2 - 150,
+        y: 40,
+        label: 'เวที (STAGE)',
+        isLocked: true,
+        isObject: true,
+      });
+
+      // สร้างโต๊ะจีน
+      groupNames.forEach((groupChar, gIndex) => {
+        const col = gIndex % groupsPerRow;
+        const row = Math.floor(gIndex / groupsPerRow);
+        
+        const centerX = galaStartX + col * groupSpacingX;
+        const centerY = galaStartY + row * groupSpacingY;
+
+        for (let j = 0; j < 8; j++) {
+          const angle = (j * Math.PI) / 4;
+          let deskX = centerX + groupRadius * Math.sin(angle) - deskWidth / 2;
+          let deskY = centerY - groupRadius * Math.cos(angle) - deskHeight / 2;
+
+          if (useMagnetGrid) {
+            deskX = Math.round(deskX / 20) * 20;
+            deskY = Math.round(deskY / 20) * 20;
+          }
+
+          newDesks.push({
+            id: `T_${groupChar}${j+1}_${Date.now()}`,
+            x: deskX,
+            y: deskY,
+            label: `${groupChar}${j + 1}`,
+            isLocked: false,
+            isObject: false
+          });
+        }
+      });
+
+      // เพิ่มทางเข้า (Entrance) ด้านล่างสุด
+      const lastRow = Math.floor((totalGroups - 1) / groupsPerRow);
+      newDesks.push({
+        id: `ENTRANCE_${Date.now()}`,
+        x: dimensions.width / 2 - 100,
+        y: galaStartY + lastRow * groupSpacingY + 200,
+        label: 'ทางเข้า (ENTRANCE)',
+        isLocked: true,
+        isObject: true,
       });
     }
 
@@ -578,11 +646,11 @@ export default function ClassroomCanvas({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">{autoLayoutConfig.deskType === 'ratree' ? 'จำนวนกลุ่มโต๊ะ (เช่น 11 = A ถึง K)' : 'จำนวนโต๊ะทั้งหมด'}</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะทั้งหมด</label>
                   <input type="number" value={autoLayoutConfig.totalDesks} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, totalDesks: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">{autoLayoutConfig.deskType === 'ratree' ? 'จำนวนกลุ่มต่อแถว (แนวนอน)' : 'จำนวนโต๊ะต่อแถว (แนวนอน)'}</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะต่อแถว (แนวนอน)</label>
                   <input type="number" value={autoLayoutConfig.desksPerRow} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, desksPerRow: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
                 </div>
               </div>
@@ -591,19 +659,12 @@ export default function ClassroomCanvas({
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ประเภทโต๊ะ</label>
                 <select
                   value={autoLayoutConfig.deskType}
-                  onChange={(e) => {
-                    const newType = e.target.value as 'single' | 'double' | 'ratree';
-                    setAutoLayoutConfig({
-                      ...autoLayoutConfig, 
-                      deskType: newType,
-                      ...(newType === 'ratree' ? { totalDesks: 11, desksPerRow: 3 } : {})
-                    });
-                  }}
+                  onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, deskType: e.target.value as 'single' | 'double' | 'gala'})}
                   className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
                 >
                   <option value="single">โต๊ะเดี่ยว (Single)</option>
                   <option value="double">โต๊ะคู่ (Double)</option>
-                  <option value="ratree">ราตรีสัมพันธ์ (กลุ่มละ 8 ที่นั่ง)</option>
+                  <option value="gala">ราตรีสัมพันธ์ (โต๊ะกลม A-K)</option>
                 </select>
               </div>
             </div>
