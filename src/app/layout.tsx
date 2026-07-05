@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/react";
+import LenisProvider from "@/components/LenisProvider";
+import StyledComponentsRegistry from "@/lib/registry";
 
 const prompt = Prompt({
   variable: "--font-prompt",
@@ -46,7 +48,11 @@ export default function RootLayout({
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
       </head>
       <body className="min-h-full flex flex-col">
-        {children}
+        <StyledComponentsRegistry>
+          <LenisProvider>
+            {children}
+          </LenisProvider>
+        </StyledComponentsRegistry>
         <Analytics />
       </body>
     </html>

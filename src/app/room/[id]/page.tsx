@@ -4,6 +4,32 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 import { DialogProvider, useDialog } from '@/components/DialogContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import styled from 'styled-components';
+
+const StyledConfirmButton = styled.button`
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: white;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  
+  &:hover:not(:disabled) {
+    box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  &:disabled {
+    background: #94a3b8;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+  }
+`;
 
 const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), { 
   ssr: false,
@@ -297,7 +323,7 @@ function BookingContent({ roomId }: { roomId: string }) {
              <div className="flex items-center gap-2"><div className="w-5 h-5 bg-[#F1F5F9] border-2 border-[#CBD5E1] rounded-md" /> จองแล้ว</div>
           </div>
   
-          <div className="w-full max-w-[1000px] flex flex-col flex-1 relative lg:bg-white lg:p-6 lg:rounded-2xl lg:border border-slate-200 overflow-hidden min-h-0">
+          <div className="w-full max-w-[1000px] flex flex-col flex-1 relative lg:bg-white lg:p-6 lg:rounded-2xl lg:border border-slate-200 overflow-hidden min-h-0 pb-32 lg:pb-0">
             <ClassroomCanvas 
               initialLayout={room.layout_config} 
               bookings={bookings} 
@@ -348,13 +374,13 @@ function BookingContent({ roomId }: { roomId: string }) {
                 </div>
              </div>
   
-             <button 
+             <StyledConfirmButton 
                onClick={confirmBooking}
                disabled={showOverlay || isBooking}
-               className="flex-1 lg:w-full shrink-0 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-3 lg:py-4 px-2 lg:px-0 rounded-lg font-bold text-sm lg:text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 whitespace-nowrap"
+               className="flex-1 lg:w-full shrink-0 py-3 lg:py-4 px-2 lg:px-0 text-sm lg:text-lg"
              >
                {isBooking ? 'กำลังจอง...' : showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
-             </button>
+             </StyledConfirmButton>
              
              <button onClick={() => router.push('/')} className="hidden lg:flex mt-4 py-3 lg:py-0 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors items-center justify-center gap-2 w-full">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
@@ -364,80 +390,118 @@ function BookingContent({ roomId }: { roomId: string }) {
         </div>
   
         {/* Overlay จบการจอง */}
-        {bookingEnded && (
-          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
-             <div className="text-center">
-               <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-widest mb-4">การจองสิ้นสุดลงแล้ว</h2>
-               <p className="text-slate-300 md:text-xl">ขออภัย หมดเวลาสำหรับการจองที่นั่งในรอบนี้</p>
-             </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {bookingEnded && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
+            >
+               <motion.div 
+                 initial={{ scale: 0.9, y: 20 }}
+                 animate={{ scale: 1, y: 0 }}
+                 className="text-center"
+               >
+                 <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-widest mb-4">การจองสิ้นสุดลงแล้ว</h2>
+                 <p className="text-slate-300 md:text-xl">ขออภัย หมดเวลาสำหรับการจองที่นั่งในรอบนี้</p>
+               </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Overlay นับถอยหลังรอจอง */}
-        {showOverlay && queueStatus !== 'active' && !bookingEnded && (
-          <div className={`fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500 ${isFadingOut ? 'opacity-0' : 'animate-in fade-in'}`}>
-            <div className="text-center flex flex-col items-center z-10 px-4 w-full">
-              {queueStatus === 'not_joined' ? (
-                 <div className="bg-white p-8 rounded-2xl max-w-sm w-full mx-auto shadow-2xl">
-                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest mb-2">เตรียมตัวจอง</h2>
-                    <p className="text-slate-500 text-sm mb-6">กรุณากรอกชื่อของคุณเพื่อเข้าสู่ห้องรอคิว</p>
-                    <input 
-                       type="text"
-                       value={studentName}
-                       onChange={(e) => setStudentName(e.target.value)}
-                       placeholder="ชื่อของคุณ"
-                       className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none font-bold text-center mb-4 text-slate-900 transition-all text-lg"
-                    />
-                    <button onClick={joinQueue} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl transition-colors uppercase tracking-widest shadow-lg shadow-red-600/30 hover:-translate-y-1">
-                       เข้าห้องรอคิว
-                    </button>
-                 </div>
-              ) : (
-                 <>
-                  <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-widest mb-2 md:mb-4 drop-shadow-lg">
-                    {queueRank ? `คุณอยู่ในคิวลำดับที่ ${queueRank}` : 'กำลังรอเข้าห้อง'}
-                  </h2>
-                  
-                  {timeLeft ? (
-                    <>
-                      <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
-          
-                      <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
-                        {timeLeft.h > 0 && (
-                          <>
-                            <span>{timeLeft.h.toString().padStart(2, '0')}</span>
-                            <span className="text-slate-500/80 -mt-1">:</span>
-                          </>
-                        )}
-                        <span>{timeLeft.m.toString().padStart(2, '0')}</span>
-                        <span className="text-slate-500/80 -mt-1">:</span>
-                        <span className="text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{timeLeft.s.toString().padStart(2, '0')}</span>
+        <AnimatePresence>
+          {showOverlay && queueStatus !== 'active' && !bookingEnded && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/85 backdrop-blur-md"
+            >
+              <div className="text-center flex flex-col items-center z-10 px-4 w-full">
+                {queueStatus === 'not_joined' ? (
+                   <motion.div 
+                     initial={{ scale: 0.9, y: 20 }}
+                     animate={{ scale: 1, y: 0 }}
+                     className="bg-white p-8 rounded-2xl max-w-sm w-full mx-auto shadow-2xl"
+                   >
+                      <h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest mb-2">เตรียมตัวจอง</h2>
+                      <p className="text-slate-500 text-sm mb-6">กรุณากรอกชื่อของคุณเพื่อเข้าสู่ห้องรอคิว</p>
+                      <input 
+                         type="text"
+                         value={studentName}
+                         onChange={(e) => setStudentName(e.target.value)}
+                         placeholder="ชื่อของคุณ"
+                         className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 outline-none font-bold text-center mb-4 text-slate-900 transition-all text-lg"
+                      />
+                      <button onClick={joinQueue} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl transition-colors uppercase tracking-widest shadow-lg shadow-red-600/30 hover:-translate-y-1">
+                         เข้าห้องรอคิว
+                      </button>
+                   </motion.div>
+                ) : (
+                   <motion.div
+                     initial={{ scale: 0.95, opacity: 0 }}
+                     animate={{ scale: 1, opacity: 1 }}
+                   >
+                    <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-widest mb-2 md:mb-4 drop-shadow-lg">
+                      {queueRank ? `คุณอยู่ในคิวลำดับที่ ${queueRank}` : 'กำลังรอเข้าห้อง'}
+                    </h2>
+                    
+                    {timeLeft ? (
+                      <>
+                        <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
+            
+                        <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+                          {timeLeft.h > 0 && (
+                            <>
+                              <span>{timeLeft.h.toString().padStart(2, '0')}</span>
+                              <span className="text-slate-500/80 -mt-1">:</span>
+                            </>
+                          )}
+                          <span>{timeLeft.m.toString().padStart(2, '0')}</span>
+                          <span className="text-slate-500/80 -mt-1">:</span>
+                          <span className="text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{timeLeft.s.toString().padStart(2, '0')}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md text-center max-w-lg leading-relaxed">
+                          กรุณารอสักครู่ ระบบจะทยอยให้ผู้ใช้เข้าจองที่นั่งตามลำดับคิว
+                          เพื่อป้องกันระบบขัดข้อง<br/>
+                          <span className="text-amber-400 text-xs md:text-sm mt-2 block font-bold">*หากคุณรีเฟรชหน้าจอ คิวของคุณจะไม่หาย*</span>
+                        </p>
+                        <div className="w-12 h-12 border-4 border-slate-600 border-t-red-500 rounded-full animate-spin"></div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center">
-                      <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md text-center max-w-lg leading-relaxed">
-                        กรุณารอสักครู่ ระบบจะทยอยให้ผู้ใช้เข้าจองที่นั่งตามลำดับคิว
-                        เพื่อป้องกันระบบขัดข้อง<br/>
-                        <span className="text-amber-400 text-xs md:text-sm mt-2 block font-bold">*หากคุณรีเฟรชหน้าจอ คิวของคุณจะไม่หาย*</span>
-                      </p>
-                      <div className="w-12 h-12 border-4 border-slate-600 border-t-red-500 rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                 </>
-              )}
-            </div>
-          </div>
-        )}
+                    )}
+                   </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ===== BOOKING CONFIRMATION MODAL — หน้ายืนยันการจองสำเร็จ ===== */}
-        {showConfirmation && confirmedBooking && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300 p-4">
-            <div id="booking-confirmation-card" className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-500">
-              {/* Header สีเขียว */}
-              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-center relative overflow-hidden">
-                <div className="absolute inset-0 opacity-10">
-                  <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
+        <AnimatePresence>
+          {showConfirmation && confirmedBooking && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                id="booking-confirmation-card" 
+                className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+              >
+                {/* Header สีเขียว */}
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-center relative overflow-hidden">
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
                   <div className="absolute bottom-0 right-0 w-60 h-60 bg-white rounded-full translate-x-1/3 translate-y-1/3" />
                 </div>
                 {/* Animated Checkmark */}
@@ -504,9 +568,10 @@ function BookingContent({ roomId }: { roomId: string }) {
               <div className="bg-slate-50 py-3 text-center border-t border-slate-100">
                 <span className="text-xs text-slate-400 font-bold tracking-widest uppercase">JongTee Booking System</span>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
   );
 }
