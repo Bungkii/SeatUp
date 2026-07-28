@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🪑 JongTee (SeatUp) - Classroom Seat Booking System
 
-## Getting Started
+ระบบจองที่นั่งและจัดแผนผังห้องเรียนออนไลน์ในรูปแบบการ์ด 2D Interactive พร้อมระบบห้องรอคิวอัตโนมัติ (Virtual Waiting Room) และการเชื่อมต่อฐานข้อมูล **Neon DB (Serverless PostgreSQL)**
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🌟 ฟีเจอร์หลัก (Features)
+
+- 🎨 **Interactive Classroom Layout Editor**: แอดมินสามารถออกแบบและจัดวางพิกัดโต๊ะเรียนได้ด้วย Drag & Drop บน Interactive Canvas
+- ⏳ **Virtual Waiting Room & Queue System**: ระบบจัดการคิวจองที่นั่งเมื่อผู้ใช้เข้าพร้อมกันหลายคน ป้องกันระบบล่มด้วยการคำนวณคิวเรียลไทม์
+- 🎟️ **Instant Booking & Ticket Export**: ผู้เรียนสามารถเลือกโต๊ะ ว่าง/จองแล้ว ยืนยันการจอง และดาวน์โหลดตั๋วหลักฐานเป็นไฟล์รูปภาพ (PNG)
+- 📊 **Admin Dashboard & CSV Export**: แอดมินสามารถดูแผนผังการจองสด รายชื่อผู้จอง ส่งออกข้อมูลเป็นไฟล์ CSV และตั้งเวลาเปิด-ปิดการจอง
+- 🏷️ **Zone & Condition Management**: กำหนดโซนพิเศษในห้องเรียนพร้อมข้อความอธิบายเงื่อนไขก่อนกดจอง
+- 🚀 **Smooth Micro-Animations**: ขับเคลื่อนด้วย Framer Motion เพื่อมอบประสบการณ์การใช้งานที่ลื่นไหลและทันสมัย
+
+---
+
+## 🛠️ เทคโนโลยีที่ใช้ (Tech Stack)
+
+- **Framework**: [Next.js 16 (App Router)](https://nextjs.org/) + React 19
+- **Database**: [Neon DB](https://neon.tech/) (Serverless PostgreSQL) ผ่าน `@neondatabase/serverless`
+- **Animations**: [Framer Motion](https://www.framer.com/motion/)
+- **Canvas Rendering**: [Konva](https://konvajs.org/) / `react-konva`
+- **Image Generation**: `html2canvas`
+- **Styling**: Tailwind CSS + Styled Components
+
+---
+
+## 📂 โครงสร้างโปรเจกต์ (Project Structure)
+
+```text
+SeatUp/
+├── neon_schema.sql             # ไฟล์ DDL สกิลเลเอาต์ฐานข้อมูล Neon DB
+├── .env.example                # ตัวอย่างการตั้งค่า Environment Variables
+├── src/
+│   ├── app/
+│   │   ├── api/                # Next.js API Routes สำหรับติดต่อ Neon DB
+│   │   │   ├── rooms/          # จัดการข้อมูลห้องและแผนผัง
+│   │   │   ├── bookings/       # จัดการการจองโต๊ะ
+│   │   │   ├── zones/          # จัดการโซนและเงื่อนไข
+│   │   │   ├── queues/         # จัดการคิว Virtual Waiting Room
+│   │   │   ├── feedbacks/      # จัดการข้อความ Feedback
+│   │   │   └── init-db/        # Endpoint สร้างตารางฐานข้อมูลอัตโนมัติ
+│   │   ├── room/[id]/          # หน้าเลือกจองที่นั่งสำหรับนักเรียน
+│   │   ├── page.tsx            # หน้าหลัก (Landing Page & Host Controls)
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── AdminPanel.tsx      # ส่วนสร้างห้องใหม่
+│   │   ├── RoomEditor.tsx      # ส่วนแก้ไขแผนผังและ Dashboard ผู้ดูแล
+│   │   ├── ClassroomCanvas.tsx # Canvas แผนผังห้องเรียน (Konva)
+│   │   └── DialogContext.tsx   # Custom Dialog / Alert System
+│   └── lib/
+│       └── db.ts               # Neon DB client helper และ schema auto-initializer
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ⚙️ การตั้งค่า Environment Variables (`.env.local`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+สร้างไฟล์ `.env.local` ในโฟลเดอร์หลักของโปรเจกต์ และใส่ตัวแปรการเชื่อมต่อฐานข้อมูล Neon DB:
 
-## Learn More
+```env
+DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@YOUR_NEON_HOST/neondb?sslmode=require"
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🚀 ขั้นตอนการติดตั้งและรันโปรเจกต์ (Getting Started)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **ติดตั้ง Dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Deploy on Vercel
+2. **รันเซิร์ฟเวอร์ในโหมดพัฒนา**:
+   ```bash
+   npm run dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **เข้าใช้งานผ่านเบราว์เซอร์**:
+   เปิด [http://localhost:3000](http://localhost:3000)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **สร้างตารางในฐานข้อมูล (Auto-init)**:
+   สามารถเข้าถึง `http://localhost:3000/api/init-db` ในเบราว์เซอร์เพื่อรันคำสั่งสร้างตารางบน Neon DB ได้โดยอัตโนมัติ
+
+---
+
+## 📜 ฐานข้อมูล (Database Schema)
+
+ตารางหลักใน Neon DB:
+1. `rooms` — เก็บข้อมูลชื่อห้อง, รหัสลับ (join_code), พิกัดโต๊ะ (layout_config), เวลาเปิด-ปิดจอง
+2. `bookings` — เก็บข้อมูลการจองโต๊ะ (`room_id`, `desk_id`, `user_name`, `confirmation_name`)
+3. `room_zones` — เก็บข้อมูลแบ่งโซนและเงื่อนไข
+4. `room_queues` — เก็บข้อมูลคิวนักเรียนใน Virtual Waiting Room
+5. `feedbacks` — เก็บข้อความข้อเสนอแนะจากผู้ใช้
+
+---
+
+## 🛠️ คำสั่งสำหรับบิลด์และตรวจทาน (Commands)
+
+```bash
+# พัฒนา (Development)
+npm run dev
+
+# บิลด์สำหรับการผลิต (Production Build)
+npm run build
+
+# ตรวจสอบโค้ด (Linting)
+npm run lint
+```
