@@ -30,9 +30,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
 # vercel
 .vercel
 
@@ -43,8 +40,12 @@ next-env.d.ts
 # สภาพแวดล้อมและตัวแปรความลับ
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
 
-# โฟลเดอร์ที่เก็บ Library (ห้าม Push เพราะมันหนักและโหลดใหม่ได้)
+# โฟลเดอร์ที่เก็บ Library
 node_modules/
 __pycache__/
 venv/
