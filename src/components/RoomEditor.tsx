@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 
 const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), { ssr: false });
@@ -23,43 +22,41 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
 
   // 1. ฟังก์ชันดึงข้อมูลผู้จอง
   const fetchBookings = async () => {
-    const { data } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('room_id', room.id)
-      .order('created_at', { ascending: false });
-    if (data) setBookings(data);
+    try {
+      const res = await fetch(`/api/bookings?roomId=${room.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bookings', err);
+    }
   };
 
   useEffect(() => {
     fetchBookings();
 
-    // เปิดใช้งาน Supabase Realtime สำหรับหน้า Dashboard แอดมิน
-    const channel = supabase
-      .channel(`admin_bookings_${room.id}_${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
-        setBookings(prev => [payload.new, ...prev]); // นำคนจองใหม่แทรกขึ้นด้านบนสุด
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
-        setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบข้อมูลที่โดนยกเลิกออกทันที
-      })
-      .subscribe();
+    // Polling เพื่ออัปเดตรายชื่อผู้จองแบบ Live (ทุก 2.5 วินาที)
+    const interval = setInterval(() => {
+      fetchBookings();
+    }, 2500);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [room.id]);
 
-  // แก้ไขตรงนี้: ปรับ parameter ให้เป็น any หรือ any[] เพื่อรับค่าจาก Canvas
+  // ปรับ parameter ให้เป็น any เพื่อรับค่าจาก Canvas
   const handleSave = async (updatedData: any) => {
     try {
-      // ในโหมด Editor ค่าที่ส่งกลับมาควรเป็น Array ของโต๊ะ (Layout)
-      const { error } = await supabase
-        .from('rooms')
-        .update({ layout_config: updatedData })
-        .eq('id', room.id);
+      const res = await fetch(`/api/rooms/${room.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layout_config: updatedData }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to save layout');
+      }
       await onDataChange(); // แจ้งให้ Parent component ดึงข้อมูลใหม่
     } catch (error: any) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
@@ -79,11 +76,17 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
         endTimestamp = new Date(endTime).toISOString();
       }
 
-      const { error } = await supabase
-        .from('rooms')
-        .update({ start_time: startTimestamp, end_time: endTimestamp })
-        .eq('id', room.id);
-      if (error) throw error;
+      const res = await fetch(`/api/rooms/${room.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_time: startTimestamp, end_time: endTimestamp }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to save time');
+      }
+
       alert('บันทึกเวลาสำเร็จ!');
       await onDataChange();
     } catch (error: any) {
@@ -94,11 +97,17 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   // ฟังก์ชันยกเลิกเวลาเปิดจอง
   const handleClearTime = async () => {
     try {
-      const { error } = await supabase
-        .from('rooms')
-        .update({ start_time: null, end_time: null })
-        .eq('id', room.id);
-      if (error) throw error;
+      const res = await fetch(`/api/rooms/${room.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_time: null, end_time: null }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to clear time');
+      }
+
       setStartTime('');
       setEndTime('');
       alert('ยกเลิกการตั้งเวลาเรียบร้อยแล้ว!');
@@ -112,11 +121,18 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const handleDeleteBooking = async (bookingId: string) => {
     if (!confirm('ยืนยันที่จะยกเลิกการจองของโต๊ะนี้ใช่หรือไม่?')) return;
     
-    const { error } = await supabase.from('bookings').delete().eq('id', bookingId);
-    if (error) {
-      alert('ลบไม่สำเร็จ: ' + error.message);
-    } else {
-      fetchBookings(); // อัปเดตตารางใหม่
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert('ลบไม่สำเร็จ: ' + (data.error || 'Unknown error'));
+      } else {
+        fetchBookings(); // อัปเดตตารางใหม่
+      }
+    } catch (e: any) {
+      alert('ลบไม่สำเร็จ: ' + e.message);
     }
   };
 
@@ -132,12 +148,10 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
 
     bookings.forEach((b, index) => {
       const date = new Date(b.created_at).toLocaleString('th-TH');
-      // เผื่อชื่อมีลูกน้ำหรืออักขระพิเศษ
       const name = `"${b.user_name.replace(/"/g, '""')}"`;
       csvRows.push(`${index + 1},${b.desk_id},${name},"${date}"`);
     });
 
-    // เพิ่ม BOM \uFEFF เพื่อให้ Excel อ่านภาษาไทยได้ถูกต้อง
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -152,11 +166,20 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const handleConfirmName = async (bookingId: string) => {
     const name = prompt('กรุณากรอกชื่อการยืนยัน (เช่น ชื่อกิจกรรมหรือรหัสอ้างอิง)');
     if (!name) return;
-    const { error } = await supabase.from('bookings').update({ confirmation_name: name }).eq('id', bookingId);
-    if (error) {
-      alert('บันทึกชื่อการยืนยันไม่สำเร็จ: ' + error.message);
-    } else {
-      fetchBookings();
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation_name: name }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert('บันทึกชื่อการยืนยันไม่สำเร็จ: ' + (data.error || 'Unknown error'));
+      } else {
+        fetchBookings();
+      }
+    } catch (e: any) {
+      alert('บันทึกชื่อการยืนยันไม่สำเร็จ: ' + e.message);
     }
   };
 
@@ -165,22 +188,38 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     const zoneName = prompt('ชื่อโซน (เช่น "เวที", "ประตู", "หน้าจอ")');
     if (!zoneName) return;
     const condition = prompt('เงื่อนไขสำหรับโซนนี้ (ใส่ข้อความอธิบาย)');
-    const { error } = await supabase.from('room_zones').insert({ room_id: room.id, zone_name: zoneName, condition_text: condition });
-    if (error) {
-      alert('เพิ่มโซนไม่สำเร็จ: ' + error.message);
-    } else {
-      fetchZones();
+    try {
+      const res = await fetch('/api/zones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_id: room.id,
+          zone_name: zoneName,
+          condition_text: condition,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert('เพิ่มโซนไม่สำเร็จ: ' + (data.error || 'Unknown error'));
+      } else {
+        fetchZones();
+      }
+    } catch (e: any) {
+      alert('เพิ่มโซนไม่สำเร็จ: ' + e.message);
     }
   };
 
   // 6. ดึงรายการโซนของห้องนี้
   const [zones, setZones] = useState<any[]>([]);
   const fetchZones = async () => {
-    const { data, error } = await supabase.from('room_zones').select('*').eq('room_id', room.id);
-    if (error) {
-      console.error('โหลดโซนไม่สำเร็จ', error);
-    } else {
-      setZones(data || []);
+    try {
+      const res = await fetch(`/api/zones?roomId=${room.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setZones(data || []);
+      }
+    } catch (err) {
+      console.error('โหลดโซนไม่สำเร็จ', err);
     }
   };
 
@@ -296,7 +335,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
 
           <ClassroomCanvas 
             initialLayout={room.layout_config} 
-            bookings={bookings} // ส่ง bookings ไปให้ Admin เห็นชื่อคนจองบนแผนผังด้วย
+            bookings={bookings} 
             zones={zones}
             onSave={handleSave} 
             isReadOnly={false}  
@@ -315,7 +354,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
               initialLayout={room.layout_config} 
               bookings={bookings}
               zones={zones}
-              onSave={() => {}} // Read-only, no action on save
+              onSave={() => {}} 
               isReadOnly={true}  
             />
           </div>

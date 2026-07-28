@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, use, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 import { DialogProvider, useDialog } from '@/components/DialogContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -64,9 +63,6 @@ function BookingContent({ roomId }: { roomId: string }) {
   const [triggerRecount, setTriggerRecount] = useState(0);
 
   useEffect(() => {
-    let channel: any;
-    let queueChannel: any;
-
     // โหลดชื่อที่เคยเซฟไว้เบื้องต้น (ถ้ามี) เผื่อว่าเข้าด้วยลิงก์เดิม
     if (typeof window !== 'undefined') {
       const savedName = localStorage.getItem(`jongtee_name_${roomId}`);
@@ -74,89 +70,87 @@ function BookingContent({ roomId }: { roomId: string }) {
     }
 
     const fetchData = async () => {
-      let roomData;
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      
-      if (uuidRegex.test(roomId)) {
-        const { data } = await supabase.from('rooms').select('*').eq('id', roomId).maybeSingle();
-        roomData = data;
-      } else {
-        const { data } = await supabase.from('rooms').select('*').eq('join_code', roomId.toUpperCase()).maybeSingle();
-        roomData = data;
-      }
-      if (roomData) {
-        setRoom(roomData);
+      try {
+        const res = await fetch(`/api/rooms/${roomId}`);
+        const roomData = await res.json();
         
-        // 1. โหลดข้อมูล Local Storage แบบชัวร์ๆ ด้วย UUID (ทำฝั่ง Client เท่านั้น)
-        if (typeof window !== 'undefined') {
-          const savedName = localStorage.getItem(`jongtee_name_${roomData.id}`);
-          const savedRank = localStorage.getItem(`jongtee_rank_${roomData.id}`);
-          const savedQueueTime = localStorage.getItem(`jongtee_queue_time_${roomData.id}`);
-          if (savedName && !studentName) setStudentName(savedName);
-          if (savedRank) {
-            setQueueRank(parseInt(savedRank, 10));
-            setQueueStatus('waiting');
+        if (roomData) {
+          setRoom(roomData);
+          
+          if (typeof window !== 'undefined') {
+            const savedName = localStorage.getItem(`jongtee_name_${roomData.id}`);
+            const savedRank = localStorage.getItem(`jongtee_rank_${roomData.id}`);
+            const savedQueueTime = localStorage.getItem(`jongtee_queue_time_${roomData.id}`);
+            if (savedName && !studentName) setStudentName(savedName);
+            if (savedRank) {
+              setQueueRank(parseInt(savedRank, 10));
+              setQueueStatus('waiting');
+            }
+            if (savedQueueTime) {
+              setQueueTime(savedQueueTime);
+            }
           }
-          if (savedQueueTime) {
-            setQueueTime(savedQueueTime);
-          }
+
+          const fetchBookings = async () => {
+            const bRes = await fetch(`/api/bookings?roomId=${roomData.id}`);
+            if (bRes.ok) {
+              const bookingData = await bRes.json();
+              setBookings(bookingData || []);
+            }
+          };
+          const fetchZones = async () => {
+            const zRes = await fetch(`/api/zones?roomId=${roomData.id}`);
+            if (zRes.ok) {
+              const zoneData = await zRes.json();
+              setZones(zoneData || []);
+            }
+          };
+          await Promise.all([fetchBookings(), fetchZones()]);
         }
-
-        const fetchBookings = async () => {
-          // เพิ่ม id ลงไปในการดึงข้อมูล เพื่อใช้กรองเวลาข้อมูลถูกลบ (DELETE) แบบเรียลไทม์
-          const { data: bookingData } = await supabase.from('bookings').select('id, desk_id, user_name').eq('room_id', roomData.id);
-          if (bookingData) setBookings(bookingData);
-        };
-        const fetchZones = async () => {
-          const { data: zoneData } = await supabase.from('room_zones').select('*').eq('room_id', roomData.id);
-          if (zoneData) setZones(zoneData);
-        };
-        await Promise.all([fetchBookings(), fetchZones()]);
-
-        // ระบบดักจับ Real-time ยัดข้อมูลใส่ State เองโดยไม่ต้องดึงใหม่จากฐานข้อมูล
-        channel = supabase
-          .channel(`public:bookings:${roomData.id}-${Date.now()}`)
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
-            setBookings(prev => {
-              // ป้องกันข้อมูลซ้ำ: เช็คว่ามี desk_id นี้อยู่แล้วหรือไม่
-              if (prev.some(b => b.desk_id === payload.new.desk_id)) return prev;
-              return [...prev, payload.new];
-            }); // นำคนจองใหม่ต่อท้ายได้เลย
-          })
-          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
-            setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
-          })
-          .subscribe();
-
-        // สมัครรับการแจ้งเตือนเมื่อมีการเปลี่ยนแปลงในตารางคิว
-        queueChannel = supabase
-          .channel(`public:room_queues:${roomData.id}-${Date.now()}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'room_queues', filter: `room_id=eq.${roomData.id}` }, () => {
-            setTriggerRecount(prev => prev + 1);
-          })
-          .subscribe();
+      } catch (e) {
+        console.error('Error fetching room data', e);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    fetchData();
 
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-      if (queueChannel) supabase.removeChannel(queueChannel);
-    };
+    fetchData();
   }, [roomId]);
+
+  // Polling สำหรับอัปเดตข้อมูล bookings & queues เรียลไทม์
+  useEffect(() => {
+    if (!room?.id) return;
+    const interval = setInterval(async () => {
+      try {
+        const bRes = await fetch(`/api/bookings?roomId=${room.id}`);
+        if (bRes.ok) {
+          const bookingData = await bRes.json();
+          setBookings(bookingData || []);
+        }
+        setTriggerRecount(prev => prev + 1);
+      } catch (e) {
+        console.error('Polling error', e);
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [room?.id]);
 
   // Effect สำหรับคำนวณคิวใหม่แบบ Real-time เมื่อมีคนออกจากคิว (หรือจองเสร็จ)
   useEffect(() => {
     if (queueTime && room && queueStatus !== 'active') {
       const recount = async () => {
-        const { count } = await supabase.from('room_queues')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room.id)
-          .lt('created_at', queueTime);
-        const rank = (count || 0) + 1;
-        setQueueRank(rank);
-        localStorage.setItem(`jongtee_rank_${room.id}`, rank.toString());
+        try {
+          const res = await fetch(`/api/queues?roomId=${room.id}&createdAt=${encodeURIComponent(queueTime)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const rank = (data.count || 0) + 1;
+            setQueueRank(rank);
+            localStorage.setItem(`jongtee_rank_${room.id}`, rank.toString());
+          }
+        } catch (e) {
+          console.error('Queue recount error', e);
+        }
       };
       recount();
     }
@@ -209,7 +203,6 @@ function BookingContent({ roomId }: { roomId: string }) {
 
         // กรณีเลยเวลาเริ่มแล้ว (now >= start)
         if (queueStatus === 'not_joined') {
-           // บังคับให้ต้องกรอกชื่อเพื่อรับคิว
            setShowOverlay(true);
            setTimeLeft(null);
            return false;
@@ -219,23 +212,21 @@ function BookingContent({ roomId }: { roomId: string }) {
         const allowedRank = 4 + bookings.length;
 
         if (queueRank && queueRank <= allowedRank) {
-           // คิวถึงแล้ว ให้เปิดหน้าจอง
            if (queueStatus !== 'active') {
              if (showOverlay) {
                setIsFadingOut(true);
                setTimeout(() => {
                  setShowOverlay(false);
                  setQueueStatus('active');
-               }, 500); // รอ Fade Out 500ms
+               }, 500);
              } else {
                setQueueStatus('active');
              }
            }
            return false; 
         } else {
-           // คิวยังไม่ถึง ต้องรอ
            setShowOverlay(true);
-           setTimeLeft(null); // ไม่ต้องมีตัวเลขนับถอยหลัง ให้ขึ้นหน้า "กำลังรอคิว"
+           setTimeLeft(null);
            return false;
         }
       }
@@ -250,7 +241,7 @@ function BookingContent({ roomId }: { roomId: string }) {
       if (checkTime()) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [room, queueStatus, queueRank, showOverlay]);
+  }, [room, queueStatus, queueRank, showOverlay, bookings.length]);
 
   const joinQueue = async () => {
     if (!studentName.trim()) return showAlert('กรุณากรอกชื่อก่อนเข้าคิว');
@@ -262,26 +253,28 @@ function BookingContent({ roomId }: { roomId: string }) {
     }
 
     try {
-      const { data, error } = await supabase.from('room_queues').insert([{
-        room_id: room.id,
-        user_name: studentName
-      }]).select().single();
+      const res = await fetch('/api/queues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_id: room.id,
+          user_name: studentName.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to join queue');
       
-      if (error) throw error;
-      
-      // หาลำดับคิว
-      const { count } = await supabase.from('room_queues')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', room.id)
-        .lt('created_at', data.created_at);
+      const rankRes = await fetch(`/api/queues?roomId=${room.id}&createdAt=${encodeURIComponent(data.created_at)}`);
+      const rankData = await rankRes.json();
+      const rank = (rankData.count || 0) + 1;
         
-      const rank = (count || 0) + 1;
       setQueueRank(rank);
       setQueueTime(data.created_at);
       setQueueStatus('waiting');
       
       // บันทึกลง Local Storage เผื่อผู้ใช้เผลอกดรีเฟรชหน้าจอ
-      localStorage.setItem(`jongtee_name_${room.id}`, studentName);
+      localStorage.setItem(`jongtee_name_${room.id}`, studentName.trim());
       localStorage.setItem(`jongtee_rank_${room.id}`, rank.toString());
       localStorage.setItem(`jongtee_queue_time_${room.id}`, data.created_at);
       
@@ -295,9 +288,8 @@ function BookingContent({ roomId }: { roomId: string }) {
     if (isPreviewMode || queueStatus !== 'active') return showAlert('คุณกำลังอยู่ในโหมดดูแผนผังล่วงหน้า หรือยังไม่ถึงคิวของคุณ ไม่สามารถกดจองได้ครับ');
     
     const isBooked = bookings.some(b => b.desk_id === deskLabel);
-    if (isBooked) return; // ถ้าจองแล้วกดไม่ได้
+    if (isBooked) return;
     
-    // ตรวจสอบเงื่อนไขโซน
     if (zoneId && zones.length > 0) {
       const zone = zones.find(z => z.id === zoneId);
       if (zone && zone.condition_text) {
@@ -306,7 +298,7 @@ function BookingContent({ roomId }: { roomId: string }) {
       }
     }
     
-    setSelectedSeat(deskLabel); // เก็บค่าโต๊ะที่เลือก
+    setSelectedSeat(deskLabel);
   };
 
   // === State สำหรับหน้ายืนยันการจอง (Confirmation Modal) ===
@@ -317,16 +309,14 @@ function BookingContent({ roomId }: { roomId: string }) {
   const confirmBooking = async () => {
     if (!studentName.trim()) return showAlert('กรุณากรอกชื่อก่อนครับ');
     if (!selectedSeat) return showAlert('กรุณาเลือกที่นั่งบนแผนผัง');
-    if (isBooking) return; // ป้องกันกดซ้ำขณะกำลังจอง
+    if (isBooking) return;
 
     try {
-      // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
       const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
       if (hasBooked) {
         return showAlert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
       }
 
-      // เช็คว่าโต๊ะนี้ถูกจองไปแล้วหรือยัง (real-time check จาก state ล่าสุด)
       const seatTaken = bookings.some(b => b.desk_id === selectedSeat);
       if (seatTaken) {
         setSelectedSeat(null);
@@ -335,32 +325,38 @@ function BookingContent({ roomId }: { roomId: string }) {
 
       setIsBooking(true);
 
-      const { error } = await supabase.from('bookings').insert([{
-        room_id: room.id,
-        desk_id: selectedSeat,
-        user_name: studentName,
-      }]);
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_id: room.id,
+          desk_id: selectedSeat,
+          user_name: studentName.trim(),
+        }),
+      });
 
-      if (error) {
+      const data = await res.json();
+
+      if (!res.ok) {
         setIsBooking(false);
-        if (error.code === '23505') { // รหัส Error 23505 = ข้อมูลซ้ำ (Unique Violation)
+        if (data.code === '23505') {
           setSelectedSeat(null);
           showAlert('ที่นั่งนี้ถูกจองตัดหน้าไปแล้ว กรุณาเลือกที่นั่งอื่น');
         } else {
-          showAlert('Error: ' + error.message);
+          showAlert('Error: ' + (data.error || 'Booking failed'));
         }
       } else {
-        // ลบออกจากคิวเมื่อจองสำเร็จเพื่อให้คิวเลื่อนสำหรับคนอื่น
-        await supabase.from('room_queues').delete().eq('room_id', room.id).eq('user_name', studentName);
+        // ลบออกจากคิวเมื่อจองสำเร็จ
+        await fetch(`/api/queues?roomId=${room.id}&userName=${encodeURIComponent(studentName.trim())}`, {
+          method: 'DELETE',
+        });
 
-        // หาเวลาปัจจุบันที่แน่นอน
         const d = new Date();
         const timeString = d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH');
 
-        // จองสำเร็จ → แสดงหน้ายืนยันการจอง (Confirmation Card)
         setConfirmedBooking({
           deskId: selectedSeat,
-          userName: studentName,
+          userName: studentName.trim(),
           roomName: room?.name || 'Unknown Room',
           time: timeString,
         });
@@ -372,6 +368,22 @@ function BookingContent({ roomId }: { roomId: string }) {
       console.error(err);
       setIsBooking(false);
       showAlert('เกิดข้อผิดพลาดที่ไม่คาดคิด: ' + (err?.message || 'Unknown Error'));
+    }
+  };
+
+  const handleDownloadImage = async () => {
+    const element = document.getElementById('booking-confirmation-card');
+    if (!element) return;
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(element);
+      const image = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `booking-${selectedSeat || 'ticket'}.png`;
+      link.click();
+    } catch (e) {
+      console.error('Failed to generate image', e);
     }
   };
 
@@ -398,7 +410,7 @@ function BookingContent({ roomId }: { roomId: string }) {
               initialLayout={room.layout_config} 
               bookings={bookings} 
               zones={zones}
-              onSave={handleSeatClick} // ส่งฟังก์ชันคลิกเลือกไป
+              onSave={handleSeatClick}
               isReadOnly={true} 
             />
           </div>
@@ -406,7 +418,6 @@ function BookingContent({ roomId }: { roomId: string }) {
   
         {/* 2. เมนูรายละเอียดการจอง (ขวา) */}
         <div className="fixed bottom-0 left-0 w-full lg:static lg:w-[380px] shrink-0 bg-white text-slate-900 flex flex-col z-40 border-t lg:border-t-0 lg:border-l border-slate-200 pb-[env(safe-area-inset-bottom)] lg:pb-0 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] lg:shadow-none">
-          {/* ซ่อน Header BOOKING SUMMARY บนมือถือเพื่อประหยัดพื้นที่ */}
           <div className="hidden lg:flex bg-slate-900 text-white p-4 lg:p-6 text-sm lg:text-lg font-black tracking-widest uppercase items-center gap-3 relative overflow-hidden shrink-0">
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
              <svg className="w-5 h-5 lg:w-6 lg:h-6 text-red-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -415,7 +426,7 @@ function BookingContent({ roomId }: { roomId: string }) {
   
           <div className="p-3 lg:p-6 flex-grow flex flex-row lg:flex-col items-center lg:items-start justify-between lg:justify-start gap-3 lg:gap-0 relative z-30">
              
-             {/* ปุ่ม Back สำหรับมือถือ แบบเล็กๆ */}
+             {/* ปุ่ม Back สำหรับมือถือ */}
              <button onClick={() => router.push('/')} className="lg:hidden flex items-center justify-center p-3 text-slate-400 hover:text-slate-900 transition-colors bg-slate-100 rounded-lg shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
              </button>
@@ -607,7 +618,7 @@ function BookingContent({ roomId }: { roomId: string }) {
           )}
         </AnimatePresence>
 
-        {/* ===== BOOKING CONFIRMATION MODAL — หน้ายืนยันการจองสำเร็จ ===== */}
+        {/* ===== BOOKING CONFIRMATION MODAL ===== */}
         <AnimatePresence>
           {showConfirmation && confirmedBooking && (
             <motion.div 
@@ -668,7 +679,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
                 {/* รหัสอ้างอิง */}
                 <div className="text-center py-2">
-                  <span className="text-xs text-slate-400 font-mono tracking-widest">REF: {room.join_code || room.id.slice(0,8).toUpperCase()}</span>
+                  <span className="text-xs text-slate-400 font-mono tracking-widest">REF: {room?.join_code || (room?.id ? room.id.slice(0,8).toUpperCase() : 'N/A')}</span>
                 </div>
 
                 {/* คำแนะนำ */}

@@ -1,5 +1,4 @@
 'use client'
-import { supabase } from '@/lib/supabase';
 import { useState } from 'react';
 
 export default function AdminPanel({ onCreated }: { onCreated: (room: any) => void }) {
@@ -19,24 +18,29 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
       { id: 'T2', x: 200, y: 100, label: 'T2' },
     ];
 
-    const { data, error } = await supabase
-      .from('rooms')
-      .insert([{ 
-        name: name, 
-        join_code: code, 
-        layout_config: defaultLayout 
-      }])
-      .select()
-      .maybeSingle(); // ใช้ maybeSingle เพื่อความปลอดภัยของ Type
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          join_code: code,
+          layout_config: defaultLayout,
+        }),
+      });
 
-    if (error) {
-      // แก้จุดที่แดง: ตรวจสอบว่า error มีจริงไหมก่อนเข้าถึง .message
-      alert('พบปัญหา: ' + (error.message || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้'));
-    } else if (data) {
-      onCreated(data); 
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert('พบปัญหา: ' + (data.error || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้'));
+      } else if (data) {
+        onCreated(data);
+      }
+    } catch (err: any) {
+      alert('พบปัญหา: ' + (err.message || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้'));
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (

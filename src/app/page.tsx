@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { DialogProvider, useDialog } from '@/components/DialogContext';
 import AdminPanel from '@/components/AdminPanel';
 import RoomEditor from '@/components/RoomEditor';
@@ -32,9 +31,14 @@ function PageContent() {
 
   const refetchEditingRoom = async () => {
     if (!editingRoom?.id) return;
-    const { data: updatedRoom } = await supabase.from('rooms').select('*').eq('id', editingRoom.id).single();
-    if (updatedRoom) {
-      setEditingRoom(updatedRoom);
+    try {
+      const res = await fetch(`/api/rooms/${editingRoom.id}`);
+      const updatedRoom = await res.json();
+      if (res.ok && updatedRoom) {
+        setEditingRoom(updatedRoom);
+      }
+    } catch (e) {
+      console.error('Failed to refetch room', e);
     }
   };
 
@@ -44,16 +48,20 @@ function PageContent() {
     setView('editor'); // สลับไปหน้าต่างจัดการ/Dashboard
   };
 
-  // ฟังก์ชันส่ง Feedback ลง Supabase
+  // ฟังก์ชันส่ง Feedback
   const handleSubmitFeedback = async () => {
     if (!feedbackText.trim()) return showAlert('พิมไรก้ได้ที่ไม่ได้ด่า');
     setIsSubmittingFeedback(true);
     try {
-      // บันทึกลงตาราง feedbacks
-      const { error } = await supabase.from('feedbacks').insert([{ message: feedbackText.trim() }]);
-      if (error) throw error;
-      
-      showAlert('ส่งข้อความสำเร็จcลว!');
+      const res = await fetch('/api/feedbacks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: feedbackText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'ส่งข้อความไม่สำเร็จ');
+
+      showAlert('ส่งข้อความสำเร็จแล้ว!');
       setFeedbackText('');
       setShowFeedback(false);
     } catch (error: any) {
@@ -132,7 +140,6 @@ function PageContent() {
               <p className="text-slate-500 text-sm mb-6">สนับสนุนการพัฒนาและเป็นดอกเบี้ยให้กุ</p>
               
               <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 mb-6 inline-block shadow-sm">
-                {/* ดึงรูป QR Code มาแสดงโดยตรงเลย */}
                 <img src="https://promptpay.io/0925384159.png" alt="PromptPay QR" className="w-48 h-48 mx-auto" />
               </div>
               
@@ -227,11 +234,17 @@ function PageContent() {
             />
             <button 
                onClick={async () => {
-                 const { data } = await supabase.from('rooms').select('*').eq('join_code', manageCode).single();
-                 if (data) {
-                   setEditingRoom(data);
-                   setView('editor');
-                 } else showAlert('ไม่พบรหัสห้องนี้ครับ');
+                 if (!manageCode.trim()) return showAlert('กรุณากรอกรหัสห้อง');
+                 try {
+                   const res = await fetch(`/api/rooms?join_code=${encodeURIComponent(manageCode)}`);
+                   const data = await res.json();
+                   if (res.ok && data) {
+                     setEditingRoom(data);
+                     setView('editor');
+                   } else showAlert('ไม่พบรหัสห้องนี้ครับ');
+                 } catch (e) {
+                   showAlert('เกิดข้อผิดพลาดในการดึงข้อมูล');
+                 }
                }}
                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-lg font-bold text-lg uppercase transition-colors"
             >
@@ -261,7 +274,7 @@ function PageContent() {
                  value={studentNameForJoin}
                  onChange={(e) => setStudentNameForJoin(e.target.value)}
                  className="w-full text-center p-3 md:p-4 rounded-lg border-2 border-slate-200 focus:border-red-600 focus:ring-4 focus:ring-red-600/10 shadow-inner outline-none transition-all text-slate-900 font-medium text-lg"
-                 placeholder="กรอกชื่อของมึง"
+                 placeholder="กรอกชื่อของคุณ"
                />
                <input 
                  type="text" 
@@ -275,9 +288,15 @@ function PageContent() {
              <button 
                 onClick={async () => {
                   if (!studentNameForJoin.trim()) return showAlert('กรุณากรอกชื่อของคุณก่อนครับ');
-                  const { data } = await supabase.from('rooms').select('id').eq('join_code', joinCode).single();
-                  if (data) router.push(`/room/${data.id}?name=${encodeURIComponent(studentNameForJoin)}`);
-                  else showAlert('ไม่พบรหัสห้องนี้ครับ');
+                  if (!joinCode.trim()) return showAlert('กรุณากรอกรหัสห้องก่อนครับ');
+                  try {
+                    const res = await fetch(`/api/rooms?join_code=${encodeURIComponent(joinCode)}`);
+                    const data = await res.json();
+                    if (res.ok && data?.id) router.push(`/room/${data.id}?name=${encodeURIComponent(studentNameForJoin)}`);
+                    else showAlert('ไม่พบรหัสห้องนี้ครับ');
+                  } catch (e) {
+                    showAlert('เกิดข้อผิดพลาดในการดึงข้อมูล');
+                  }
                 }}
                 className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-bold text-lg uppercase transition-colors"
              >
